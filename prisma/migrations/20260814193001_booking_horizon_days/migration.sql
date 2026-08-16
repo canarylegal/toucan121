@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Host" ADD COLUMN IF NOT EXISTS "bookingHorizonDays" INTEGER NOT NULL DEFAULT 60;

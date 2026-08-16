@@ -1,0 +1,161 @@
+import type { ReactNode, SVGProps } from "react";
+
+type IconProps = SVGProps<SVGSVGElement>;
+
+function IconBase(props: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      aria-hidden
+      width="1.15em"
+      height="1.15em"
+      {...props}
+    />
+  );
+}
+
+export function LinkedInIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M20.45 20.45h-3.55v-5.57c0-1.33-.03-3.04-1.85-3.04-1.85 0-2.14 1.45-2.14 2.94v5.67H9.36V9h3.41v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46v6.28zM5.34 7.43a2.06 2.06 0 1 1 0-4.12 2.06 2.06 0 0 1 0 4.12zM7.12 20.45H3.55V9h3.57v11.45zM22.23 0H1.77C.79 0 0 .77 0 1.73v20.54C0 23.23.79 24 1.77 24h20.46c.98 0 1.77-.77 1.77-1.73V1.73C24 .77 23.21 0 22.23 0z" />
+    </IconBase>
+  );
+}
+
+export function FacebookIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M22.68 0H1.32A1.32 1.32 0 0 0 0 1.32v21.36A1.32 1.32 0 0 0 1.32 24h11.5v-9.29H9.69v-3.62h3.13V8.41c0-3.1 1.89-4.79 4.66-4.79 1.33 0 2.47.1 2.8.14v3.24h-1.92c-1.5 0-1.8.72-1.8 1.77v2.32h3.59l-.47 3.62h-3.12V24h6.12A1.32 1.32 0 0 0 24 22.68V1.32A1.32 1.32 0 0 0 22.68 0z" />
+    </IconBase>
+  );
+}
+
+export function InstagramIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M12 2.16c3.2 0 3.58.01 4.85.07 3.25.15 4.77 1.69 4.92 4.92.06 1.27.07 1.65.07 4.85s-.01 3.58-.07 4.85c-.15 3.23-1.66 4.77-4.92 4.92-1.27.06-1.65.07-4.85.07s-3.58-.01-4.85-.07c-3.26-.15-4.77-1.7-4.92-4.92-.06-1.27-.07-1.65-.07-4.85s.01-3.58.07-4.85C2.38 3.92 3.9 2.38 7.15 2.23 8.42 2.17 8.8 2.16 12 2.16zM12 0C8.74 0 8.33.01 7.05.07 2.7.27.27 2.69.07 7.05.01 8.33 0 8.74 0 12s.01 3.67.07 4.95c.2 4.36 2.62 6.78 6.98 6.98C8.33 23.99 8.74 24 12 24s3.67-.01 4.95-.07c4.35-.2 6.78-2.62 6.98-6.98.06-1.28.07-1.69.07-4.95s-.01-3.67-.07-4.95C23.73 2.69 21.31.27 16.95.07 15.67.01 15.26 0 12 0zm0 5.84A6.16 6.16 0 1 0 18.16 12 6.16 6.16 0 0 0 12 5.84zM12 16a4 4 0 1 1 4-4 4 4 0 0 1-4 4zm6.41-11.85a1.44 1.44 0 1 0 1.44 1.44 1.44 1.44 0 0 0-1.44-1.44z" />
+    </IconBase>
+  );
+}
+
+export function TikTokIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M12.53.02C13.84 0 15.14.01 16.44 0c.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.65-.24-1.35-.39-2.06-.39-1.03-.05-2.05.38-2.68 1.19-.55.73-.67 1.75-.4 2.62.37 1.26 1.55 2.15 2.87 2.1 1.07.04 2.12-.55 2.67-1.47.18-.32.28-.67.31-1.04.07-3.64.03-7.29.03-10.93z" />
+    </IconBase>
+  );
+}
+
+export function XIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M18.9 1.15h3.55l-7.76 8.87L24 22.85h-7.4l-5.8-7.58-6.63 7.58H.61l8.3-9.49L0 1.15h7.59l5.24 6.93 6.07-6.93zm-1.25 19.5h1.97L6.45 3.16H4.34l13.31 17.49z" />
+    </IconBase>
+  );
+}
+
+export function YouTubeIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M23.5 6.19a3.02 3.02 0 0 0-2.12-2.14C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.38.55A3.02 3.02 0 0 0 .5 6.19 31.6 31.6 0 0 0 0 12a31.6 31.6 0 0 0 .5 5.81 3.02 3.02 0 0 0 2.12 2.14C4.5 20.5 12 20.5 12 20.5s7.5 0 9.38-.55a3.02 3.02 0 0 0 2.12-2.14A31.6 31.6 0 0 0 24 12a31.6 31.6 0 0 0-.5-5.81zM9.75 15.57V8.43L15.82 12l-6.07 3.57z" />
+    </IconBase>
+  );
+}
+
+export function PhoneIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M6.62 10.79a15.15 15.15 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 1.01-.24c1.12.37 2.33.57 3.58.57a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.46.57 3.58a1 1 0 0 1-.25 1.02l-2.2 2.19z" />
+    </IconBase>
+  );
+}
+
+export function MailIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M20 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2zm0 4-8 5L4 8V6l8 5 8-5v2z" />
+    </IconBase>
+  );
+}
+
+export function GlobeIcon(props: IconProps) {
+  return (
+    <IconBase {...props}>
+      <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm6.93 6h-2.95a15.7 15.7 0 0 0-1.38-3.56A8.03 8.03 0 0 1 18.93 8zM12 4.04c.83 1.2 1.48 2.53 1.91 3.96h-3.82A13.4 13.4 0 0 1 12 4.04zM4.26 14a7.96 7.96 0 0 1 0-4h3.38a16.4 16.4 0 0 0-.1 2c0 .68.03 1.35.1 2H4.26zm.81 2h2.95c.3 1.25.75 2.45 1.38 3.56A8.03 8.03 0 0 1 5.07 16zM8.07 8H5.07a8.03 8.03 0 0 1 4.33-3.56A15.7 15.7 0 0 0 8.07 8zM12 19.96A13.4 13.4 0 0 1 10.09 16h3.82A13.4 13.4 0 0 1 12 19.96zM15.36 14H8.64a14.5 14.5 0 0 1-.14-2c0-.68.05-1.35.14-2h6.72c.09.65.14 1.32.14 2s-.05 1.35-.14 2zm.24 5.56c.63-1.11 1.08-2.31 1.38-3.56h2.95a8.03 8.03 0 0 1-4.33 3.56zM16.36 12c0-.68-.03-1.35-.1-2h3.38a7.96 7.96 0 0 1 0 4h-3.38c.07-.65.1-1.32.1-2z" />
+    </IconBase>
+  );
+}
+
+export type SocialLinkKey =
+  | "websiteUrl"
+  | "linkedinUrl"
+  | "facebookUrl"
+  | "instagramUrl"
+  | "tiktokUrl"
+  | "xUrl"
+  | "youtubeUrl"
+  | "publicEmail"
+  | "phone";
+
+export const SOCIAL_LINK_META: {
+  key: SocialLinkKey;
+  label: string;
+  Icon: (props: IconProps) => ReactNode;
+  href: (value: string) => string;
+}[] = [
+  {
+    key: "linkedinUrl",
+    label: "LinkedIn",
+    Icon: LinkedInIcon,
+    href: (v) => v,
+  },
+  {
+    key: "facebookUrl",
+    label: "Facebook",
+    Icon: FacebookIcon,
+    href: (v) => v,
+  },
+  {
+    key: "instagramUrl",
+    label: "Instagram",
+    Icon: InstagramIcon,
+    href: (v) => v,
+  },
+  {
+    key: "tiktokUrl",
+    label: "TikTok",
+    Icon: TikTokIcon,
+    href: (v) => v,
+  },
+  {
+    key: "xUrl",
+    label: "X",
+    Icon: XIcon,
+    href: (v) => v,
+  },
+  {
+    key: "youtubeUrl",
+    label: "YouTube",
+    Icon: YouTubeIcon,
+    href: (v) => v,
+  },
+  {
+    key: "websiteUrl",
+    label: "Website",
+    Icon: GlobeIcon,
+    href: (v) => v,
+  },
+  {
+    key: "publicEmail",
+    label: "Email",
+    Icon: MailIcon,
+    href: (v) => `mailto:${v}`,
+  },
+  {
+    key: "phone",
+    label: "Phone",
+    Icon: PhoneIcon,
+    href: (v) => `tel:${v.replace(/[^\d+]/g, "")}`,
+  },
+];

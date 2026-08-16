@@ -1,0 +1,445 @@
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { prisma } from "@/lib/db";
+import { logoutAction } from "@/lib/auth-actions";
+import { toggleMeetingTypeAction } from "@/lib/meeting-type-actions";
+import {
+  getOptionalHost,
+  requireUserOrRedirect,
+} from "@/lib/current-user";
+import { incomingConnectionCount } from "@/lib/connections";
+import { HostBookingList } from "@/components/host-booking-list";
+import { HostWrapUpList } from "@/components/host-wrap-up-list";
+import { CopyLinkButton } from "@/components/copy-link-button";
+import { ToucanBrand } from "@/components/toucan-brand";
+import { formatSlotLabel } from "@/lib/availability";
+
+export const dynamic = "force-dynamic";
+
+export default async function DashPage({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    booked?: string;
+    rescheduled?: string;
+    cancelled?: string;
+    deletedMeetingType?: string;
+    meetingTypeCreated?: string;
+    hostingEnabled?: string;
+  }>;
+}) {
+  const user = await requireUserOrRedirect();
+  const host = await getOptionalHost();
+  const q = await searchParams;
+  const incomingConnections = await incomingConnectionCount(user.id);
+  const connectionsLabel =
+    incomingConnections > 0
+      ? `Connections (${incomingConnections})`
+      : "Connections";
+
+  if (!host) {
+    const visits = await prisma.booking.findMany({
+      where: { guestEmail: { equals: user.email, mode: "insensitive" } },
+      orderBy: { startsAt: "desc" },
+      take: 8,
+      include: {
+        host: { select: { name: true, slug: true, timezone: true } },
+        meetingType: { select: { title: true } },
+      },
+    });
+
+    return (
+      <main className="mx-auto w-full max-w-xl px-6 py-12">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <ToucanBrand />
+          <form action={logoutAction}>
+            <button
+              type="submit"
+              className="text-sm font-medium text-muted underline hover:text-foreground"
+            >
+              Sign out
+            </button>
+          </form>
+        </div>
+        <h1 className="mt-4 font-serif text-4xl tracking-tight">
+          Hello, {user.name}
+        </h1>
+        <p className="mt-2 text-muted">
+          Your account is ready. Book others as a visitor, or start hosting
+          when you want a public profile page.
+        </p>
+
+        <div className="mt-8 flex flex-wrap gap-3">
+          <Link
+            href="/dash/hosting/setup"
+            className="rounded-md bg-accent px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90"
+          >
+            Start hosting
+          </Link>
+          <Link
+            href="/dash/visits"
+            className="rounded-md border border-line bg-panel px-4 py-2.5 text-sm font-semibold hover:bg-accent-soft"
+          >
+            My bookings
+          </Link>
+          <Link
+            href="/dash/connections"
+            className="rounded-md border border-line bg-panel px-4 py-2.5 text-sm font-semibold hover:bg-accent-soft"
+          >
+            {connectionsLabel}
+          </Link>
+        </div>
+
+        <section className="mt-10 rounded-lg border border-line bg-panel p-5">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold">Recent bookings</h2>
+            <Link
+              href="/dash/visits"
+              className="text-sm font-medium text-accent underline"
+            >
+              View all
+            </Link>
+          </div>
+          {visits.length === 0 ? (
+            <p className="mt-3 text-sm text-muted">
+              No bookings yet. When you book someone&apos;s profile page with
+              this email, they show up here.
+            </p>
+          ) : (
+            <ul className="mt-3 space-y-3 text-sm">
+              {visits.map((b) => (
+                <li
+                  key={b.id}
+                  className="border-b border-line pb-3 last:border-0 last:pb-0"
+                >
+                  <p className="font-medium">
+                    {b.meetingType.title} with {b.host.name}
+                  </p>
+                  <p className="text-muted">
+                    {formatSlotLabel(b.startsAt, b.host.timezone)} · {b.status}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </main>
+    );
+  }
+
+  const now = new Date();
+  const hostId = host.id;
+  const since30Days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+  const [hostFull, wrapUp, upcoming, recent, cancelledList] =
+    await Promise.all([
+      prisma.host.findUnique({
+        where: { id: hostId },
+        include: {
+          meetingTypes: {
+            where: { deletedAt: null },
+            orderBy: { title: "asc" },
+          },
+        },
+      }),
+      prisma.booking.findMany({
+        where: {
+          hostId,
+          status: "CONFIRMED",
+          endsAt: { lte: now },
+        },
+        orderBy: { endsAt: "desc" },
+        take: 20,
+        include: { meetingType: { select: { title: true } } },
+      }),
+      prisma.booking.findMany({
+        where: {
+          hostId,
+          status: { in: ["PENDING", "CONFIRMED"] },
+          endsAt: { gt: now },
+        },
+        orderBy: { startsAt: "asc" },
+        take: 15,
+        include: { meetingType: { select: { title: true } } },
+      }),
+      prisma.booking.findMany({
+        where: {
+          hostId,
+          endsAt: { gte: since30Days },
+          OR: [
+            { status: "COMPLETED" },
+            { status: "PENDING", endsAt: { lte: now } },
+          ],
+        },
+        orderBy: [{ completedAt: "desc" }, { startsAt: "desc" }],
+        take: 50,
+        include: { meetingType: { select: { title: true } } },
+      }),
+      prisma.booking.findMany({
+        where: {
+          hostId,
+          status: "CANCELLED",
+          updatedAt: { gte: since30Days },
+        },
+        orderBy: { updatedAt: "desc" },
+        take: 50,
+        include: { meetingType: { select: { title: true } } },
+      }),
+    ]);
+
+  if (!hostFull) {
+    redirect("/login");
+  }
+
+  const appUrl = process.env.APP_URL ?? "http://localhost:3000";
+  const booked = q.booked === "1";
+  const rescheduled = q.rescheduled === "1";
+  const cancelled = q.cancelled === "1";
+  const deletedMeetingType = q.deletedMeetingType === "1";
+  const meetingTypeCreated = q.meetingTypeCreated === "1";
+  const hostingEnabled = q.hostingEnabled === "1";
+  const bookingUrl = `${appUrl}/${hostFull.slug}`;
+
+  return (
+    <main className="mx-auto w-full max-w-7xl px-6 py-12">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <ToucanBrand />
+        <form action={logoutAction}>
+          <button
+            type="submit"
+            className="text-sm font-medium text-muted underline hover:text-foreground"
+          >
+            Sign out
+          </button>
+        </form>
+      </div>
+
+      <h1 className="mt-4 font-serif text-4xl tracking-tight">
+        Hello, {hostFull.name}
+      </h1>
+      <p className="mt-2 max-w-xl text-muted">
+        Your public profile page is live.
+      </p>
+
+      {hostingEnabled ? (
+        <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+          Hosting enabled — connect a calendar and share your profile link.
+        </p>
+      ) : null}
+      {booked ? (
+        <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+          Invitation sent — pending until the invitee accepts.
+        </p>
+      ) : null}
+      {rescheduled ? (
+        <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+          Booking rescheduled — guest emailed.
+        </p>
+      ) : null}
+      {cancelled ? (
+        <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+          Booking cancelled — guest emailed.
+        </p>
+      ) : null}
+      {deletedMeetingType ? (
+        <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+          Meeting type deleted.
+        </p>
+      ) : null}
+      {meetingTypeCreated ? (
+        <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+          Meeting type created.
+        </p>
+      ) : null}
+
+      <div className="mt-6 border-l-4 border-accent bg-accent-soft/50 px-5 py-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent">
+          Profile page
+        </p>
+        <div className="mt-2 flex flex-wrap items-center gap-3">
+          <p className="min-w-0 flex-1 break-all font-serif text-xl tracking-tight sm:text-2xl">
+            <Link
+              href={`/${hostFull.slug}`}
+              className="text-foreground underline decoration-accent/40 underline-offset-4 hover:decoration-accent"
+            >
+              {bookingUrl}
+            </Link>
+          </p>
+          <CopyLinkButton value={bookingUrl} />
+        </div>
+      </div>
+
+      <div className="mt-6 flex flex-wrap gap-3">
+        <Link
+          href="/dash/bookings/new"
+          className="rounded-md bg-accent px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90"
+        >
+          New booking
+        </Link>
+        <Link
+          href="/dash/meetings/new"
+          className="rounded-md border border-line bg-panel px-4 py-2.5 text-sm font-semibold hover:bg-accent-soft"
+        >
+          Add meeting type
+        </Link>
+        <Link
+          href={`/${hostFull.slug}?edit=1`}
+          className="rounded-md border border-line bg-panel px-4 py-2.5 text-sm font-semibold hover:bg-accent-soft"
+        >
+          Edit profile
+        </Link>
+        <Link
+          href="/dash/schedule"
+          className="rounded-md border border-line bg-panel px-4 py-2.5 text-sm font-semibold hover:bg-accent-soft"
+        >
+          View schedule
+        </Link>
+        <Link
+          href="/dash/calendar"
+          className="rounded-md border border-line bg-panel px-4 py-2.5 text-sm font-semibold hover:bg-accent-soft"
+        >
+          Connect calendar
+        </Link>
+        <Link
+          href="/dash/connections"
+          className="rounded-md border border-line bg-panel px-4 py-2.5 text-sm font-semibold hover:bg-accent-soft"
+        >
+          {connectionsLabel}
+        </Link>
+      </div>
+
+      <HostWrapUpList bookings={wrapUp} timezone={hostFull.timezone} />
+
+      <div className="mt-8 grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
+        <section className="rounded-lg border border-line bg-panel p-5">
+          <h2 className="text-lg font-semibold">Meeting types</h2>
+          {hostFull.meetingTypes.length === 0 ? (
+            <p className="mt-3 text-sm text-muted">
+              No meeting types yet — create one to start taking bookings.
+            </p>
+          ) : (
+            <ul className="mt-3 space-y-3 text-sm">
+              {hostFull.meetingTypes.map((mt) => (
+                <li
+                  key={mt.id}
+                  className="border-b border-line pb-3 last:border-0 last:pb-0"
+                >
+                  <p className="font-medium">
+                    {mt.title}{" "}
+                    {!mt.active ? (
+                      <span className="text-muted">(inactive)</span>
+                    ) : null}
+                  </p>
+                  <p className="text-muted">
+                    {mt.durationMins} min
+                    {mt.bufferBefore || mt.bufferAfter
+                      ? ` · buffer ${mt.bufferBefore}/${mt.bufferAfter}`
+                      : ""}{" "}
+                    ·{" "}
+                    {mt.locationType === "VIDEO"
+                      ? mt.videoUrl.trim()
+                        ? "video · fixed link"
+                        : "video · Jitsi"
+                      : mt.venuePolicy === "GUEST_PROPOSES"
+                        ? "in person · guest venue"
+                        : "in person"}{" "}
+                    ·{" "}
+                    {mt.approvalMode === "AUTO"
+                      ? "auto-confirm"
+                      : mt.approvalMode === "MANUAL"
+                        ? "manual approval"
+                        : mt.approvalMode === "CONNECTIONS"
+                          ? "auto if connected"
+                          : "conditional"}
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-3">
+                    <Link
+                      href={`/dash/meetings/${mt.id}`}
+                      className="font-medium text-accent underline"
+                    >
+                      Edit
+                    </Link>
+                    <Link
+                      href={`/${hostFull.slug}/${mt.slug}`}
+                      className="text-muted underline"
+                    >
+                      Preview
+                    </Link>
+                    <form action={toggleMeetingTypeAction}>
+                      <input type="hidden" name="id" value={mt.id} />
+                      <input
+                        type="hidden"
+                        name="active"
+                        value={mt.active ? "false" : "true"}
+                      />
+                      <button
+                        type="submit"
+                        className="text-muted underline hover:text-foreground"
+                      >
+                        {mt.active ? "Disable" : "Enable"}
+                      </button>
+                    </form>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section className="rounded-lg border border-line bg-panel p-5">
+          <h2 className="text-lg font-semibold">Upcoming meetings</h2>
+          <HostBookingList
+            bookings={upcoming}
+            timezone={hostFull.timezone}
+            empty="Nothing upcoming."
+          />
+        </section>
+
+        <section className="rounded-lg border border-line bg-panel p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold">Recent meetings</h2>
+            <Link
+              href="/dash/history"
+              className="text-sm font-medium text-accent underline"
+            >
+              Full history
+            </Link>
+          </div>
+          <p className="mt-1 text-xs text-muted">Last 30 days</p>
+          <HostBookingList
+            bookings={recent}
+            timezone={hostFull.timezone}
+            empty="No meetings in the last 30 days."
+            showActionStatus
+          />
+        </section>
+
+        <section className="rounded-lg border border-line bg-panel p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold">
+              Cancelled{" "}
+              {cancelledList.length > 0 ? (
+                <span className="text-sm font-normal text-muted">
+                  ({cancelledList.length})
+                </span>
+              ) : null}
+            </h2>
+            <Link
+              href="/dash/history"
+              className="text-sm font-medium text-accent underline"
+            >
+              Full history
+            </Link>
+          </div>
+          <p className="mt-1 text-xs text-muted">Last 30 days</p>
+          <HostBookingList
+            bookings={cancelledList}
+            timezone={hostFull.timezone}
+            empty="No cancellations in the last 30 days."
+            allowRescheduleCancelled
+          />
+        </section>
+      </div>
+    </main>
+  );
+}

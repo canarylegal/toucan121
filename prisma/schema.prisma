@@ -1,0 +1,276 @@
+// Toucan — appointment booking
+// https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum CalendarProvider {
+  CALDAV
+  OUTLOOK
+  GOOGLE
+}
+
+enum MeetingLocationType {
+  IN_PERSON
+  VIDEO
+}
+
+/// Who chooses the in-person venue
+enum VenuePolicy {
+  HOST_FIXED
+  GUEST_PROPOSES
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
+enum BookingApprovalMode {
+  /// Guest bookings confirm immediately
+  AUTO
+  /// Guest bookings wait for host approval
+  MANUAL
+  /// Guest bookings confirm only when approval rules pass
+  CONDITIONAL
+  /// Auto-confirm when the guest is an accepted connection
+  CONNECTIONS
+}
+
+enum ConnectionStatus {
+  PENDING
+  ACCEPTED
+}
+
+enum BookingPendingOn {
+  HOST
+  GUEST
+}
+
+enum ReminderRecipient {
+  HOST
+  GUEST
+}
+
+enum ReminderKind {
+  RECURRING
+  FINAL
+}
+
+enum ScheduleViewMode {
+  DAY
+  WEEK
+  MONTH
+  LIST
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  host Host?
+
+  connectionsLow         UserConnection[] @relation("ConnectionLow")
+  connectionsHigh        UserConnection[] @relation("ConnectionHigh")
+  connectionRequestsMade UserConnection[] @relation("ConnectionRequester")
+}
+
+model Host {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  email        String   @unique
+  name         String
+  /// Short job title / headline shown under the name
+  headline     String   @default("")
+  businessName String   @default("")
+  bio          String   @default("")
+  /// Public URL path for avatar, e.g. /uploads/avatars/….jpg
+  avatarPath   String?
+  websiteUrl   String   @default("")
+  /// Optional public contact email (may differ from account email)
+  publicEmail  String   @default("")
+  phone        String   @default("")
+  linkedinUrl  String   @default("")
+  facebookUrl  String   @default("")
+  instagramUrl String   @default("")
+  tiktokUrl    String   @default("")
+  xUrl         String   @default("")
+  youtubeUrl   String   @default("")
+  /// JSON array of SocialLinkKey for public icon order
+  socialOrderJson String @default("[]")
+  slug         String   @unique
+  timezone     String   @default("Europe/London")
+  /// How many days ahead guests can book
+  bookingHorizonDays Int @default(60)
+  scheduleView ScheduleViewMode @default(WEEK)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  meetingTypes MeetingType[]
+  calendars    CalendarConnection[]
+  bookings     Booking[]
+  timeBlocks   HostTimeBlock[]
+}
+
+/// Undirected account pair (userLowId < userHighId). PENDING = request; ACCEPTED = connected.
+model UserConnection {
+  id            String           @id @default(cuid())
+  userLowId     String
+  userHighId    String
+  requestedById String
+  status        ConnectionStatus
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  userLow     User @relation("ConnectionLow", fields: [userLowId], references: [id], onDelete: Cascade)
+  userHigh    User @relation("ConnectionHigh", fields: [userHighId], references: [id], onDelete: Cascade)
+  requestedBy User @relation("ConnectionRequester", fields: [requestedById], references: [id], onDelete: Cascade)
+
+  @@unique([userLowId, userHighId])
+  @@index([userLowId, status])
+  @@index([userHighId, status])
+  @@index([requestedById, status])
+}
+
+model CalendarConnection {
+  id          String           @id @default(cuid())
+  hostId      String
+  provider    CalendarProvider
+  label       String
+  /// Provider-specific credentials (AES-256-GCM encrypted JSON; legacy plaintext still readable)
+  configJson  String           @default("{}")
+  isPrimary   Boolean          @default(true)
+  writeTarget Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  host Host @relation(fields: [hostId], references: [id], onDelete: Cascade)
+
+  @@index([hostId])
+}
+
+/// One-off unavailable window (blocks guest booking; optional calendar write).
+model HostTimeBlock {
+  id              String   @id @default(cuid())
+  hostId          String
+  startsAt        DateTime
+  endsAt          DateTime
+  note            String   @default("")
+  calendarEventId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  host Host @relation(fields: [hostId], references: [id], onDelete: Cascade)
+
+  @@index([hostId, startsAt])
+}
+
+model MeetingType {
+  id               String              @id @default(cuid())
+  hostId           String
+  slug             String
+  title            String
+  description      String              @default("")
+  durationMins     Int                 @default(30)
+  locationType     MeetingLocationType @default(VIDEO)
+  /// HOST_FIXED uses locationNote; GUEST_PROPOSES collects venue at booking time
+  venuePolicy      VenuePolicy         @default(HOST_FIXED)
+  locationNote     String              @default("")
+  /// VIDEO only: empty → unique Jitsi room per booking; otherwise standing Zoom/Teams/Meet/etc link
+  videoUrl         String              @default("")
+  bufferBefore     Int                 @default(0)
+  bufferAfter      Int                 @default(0)
+  /// JSON: weekly availability windows in host timezone
+  availabilityJson String              @default("[]")
+  approvalMode     BookingApprovalMode @default(AUTO)
+  /// JSON rules for CONDITIONAL mode, e.g. { "requireKnownGuest": true, "minNoticeHours": 24 }
+  approvalRulesJson String             @default("{}")
+  /// Host reminder prefs JSON: { recurring, final }
+  hostReminderJson  String             @default("{\"recurring\":{\"enabled\":false,\"every\":1,\"unit\":\"WEEKS\"},\"final\":{\"enabled\":true,\"amount\":24,\"unit\":\"HOURS\"}}")
+  /// Default guest reminder prefs JSON
+  guestReminderJson String             @default("{\"recurring\":{\"enabled\":false,\"every\":1,\"unit\":\"WEEKS\"},\"final\":{\"enabled\":true,\"amount\":24,\"unit\":\"HOURS\"}}")
+  active           Boolean             @default(true)
+  /// Soft-delete — hidden from hosts/guests; kept for booking history
+  deletedAt        DateTime?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  host     Host      @relation(fields: [hostId], references: [id], onDelete: Cascade)
+  bookings Booking[]
+
+  @@unique([hostId, slug])
+  @@index([hostId])
+}
+
+model Booking {
+  id              String              @id @default(cuid())
+  hostId          String
+  meetingTypeId   String
+  guestName       String
+  guestEmail      String
+  startsAt        DateTime
+  endsAt          DateTime
+  status          BookingStatus       @default(CONFIRMED)
+  pendingOn       BookingPendingOn?
+  /// Opaque token for guest accept/decline links
+  manageToken     String              @unique @default(cuid())
+  locationType    MeetingLocationType
+  /// Resolved meeting place (in-person); empty for video
+  venue           String              @default("")
+  /// Join URL for video bookings (Jitsi room or host custom link)
+  jitsiUrl        String?
+  calendarEventId String?
+  notes           String              @default("")
+  emailOptIn      Boolean             @default(true)
+  /// Snapshot of host reminder prefs at booking/confirm time
+  hostReminderJson  String            @default("{}")
+  /// Guest reminder prefs (defaults from meeting type; editable before confirm/accept)
+  guestReminderJson String            @default("{}")
+  /// Set when status becomes CONFIRMED (drives recurring reminder cadence)
+  confirmedAt     DateTime?
+  /// Set when host marks the meeting completed (wrap-up)
+  completedAt     DateTime?
+  /// JSON array of action points: [{ id, text, done }]
+  actionPoints    String              @default("[]")
+  /// Cached: true when no points or all done
+  actionPointsDone Boolean            @default(true)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  host        Host        @relation(fields: [hostId], references: [id], onDelete: Cascade)
+  meetingType MeetingType @relation(fields: [meetingTypeId], references: [id], onDelete: Restrict)
+  reminders   BookingReminder[]
+
+  @@index([hostId, startsAt])
+  @@index([guestEmail])
+  @@index([hostId, status, pendingOn])
+}
+
+model BookingReminder {
+  id           String            @id @default(cuid())
+  bookingId    String
+  recipient    ReminderRecipient
+  kind         ReminderKind
+  scheduledFor DateTime
+  sentAt       DateTime?
+  cancelledAt  DateTime?
+  createdAt    DateTime          @default(now())
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([scheduledFor, sentAt, cancelledAt])
+  @@index([bookingId])
+}

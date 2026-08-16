@@ -1,0 +1,207 @@
+"use client";
+
+import { useActionState, useEffect, useState } from "react";
+import {
+  SlotCalendarPicker,
+  type BookingSlotCandidate,
+} from "@/components/slot-calendar-picker";
+import {
+  createHostBookingAction,
+  type HostBookingFormState,
+} from "@/lib/host-booking-actions";
+
+type MeetingTypeOption = {
+  id: string;
+  title: string;
+  durationMins: number;
+  active: boolean;
+  locationType: "VIDEO" | "IN_PERSON";
+  venuePolicy: "HOST_FIXED" | "GUEST_PROPOSES";
+  locationNote: string;
+};
+
+export function HostBookingForm({
+  meetingTypes,
+  timezone,
+  initialMeetingTypeId,
+}: {
+  meetingTypes: MeetingTypeOption[];
+  timezone: string;
+  initialMeetingTypeId?: string;
+}) {
+  const [state, action, pending] = useActionState(createHostBookingAction, {
+    values: {
+      meetingTypeId: initialMeetingTypeId ?? meetingTypes[0]?.id ?? "",
+      guestName: "",
+      guestEmail: "",
+      notes: "",
+      startsAt: "",
+      venue: "",
+    },
+  } satisfies HostBookingFormState);
+
+  const values = state.values ?? {
+    meetingTypeId: initialMeetingTypeId ?? meetingTypes[0]?.id ?? "",
+    guestName: "",
+    guestEmail: "",
+    notes: "",
+    startsAt: "",
+    venue: "",
+  };
+
+  const [meetingTypeId, setMeetingTypeId] = useState(values.meetingTypeId);
+  const [startsAt, setStartsAt] = useState(values.startsAt);
+  const [candidates, setCandidates] = useState<BookingSlotCandidate[]>([]);
+  const [slotsError, setSlotsError] = useState<string | null>(null);
+  const [loadingSlots, setLoadingSlots] = useState(false);
+
+  const selected = meetingTypes.find((mt) => mt.id === meetingTypeId);
+  const needsGuestVenue =
+    selected?.locationType === "IN_PERSON" &&
+    selected.venuePolicy === "GUEST_PROPOSES";
+
+  useEffect(() => {
+    if (!meetingTypeId) {
+      setCandidates([]);
+      return;
+    }
+
+    let cancelled = false;
+    setLoadingSlots(true);
+    setSlotsError(null);
+    setStartsAt("");
+
+    fetch(`/api/host/availability?meetingTypeId=${encodeURIComponent(meetingTypeId)}`)
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? "Failed to load slots");
+        if (!cancelled) setCandidates(data.candidates ?? []);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setCandidates([]);
+          setSlotsError(
+            err instanceof Error ? err.message : "Failed to load slots",
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingSlots(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [meetingTypeId, state.formKey]);
+
+  return (
+    <form action={action} className="space-y-6">
+      <input type="hidden" name="startsAt" value={startsAt} />
+
+      <label className="block space-y-1.5">
+        <span className="text-sm font-medium">Meeting type</span>
+        <select
+          name="meetingTypeId"
+          className="w-full rounded-md border border-line bg-white px-3 py-2"
+          value={meetingTypeId}
+          onChange={(e) => setMeetingTypeId(e.target.value)}
+          required
+        >
+          {meetingTypes.map((mt) => (
+            <option key={mt.id} value={mt.id}>
+              {mt.title} ({mt.durationMins} min)
+              {!mt.active ? " — inactive" : ""}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      {selected?.locationType === "IN_PERSON" &&
+      selected.venuePolicy === "HOST_FIXED" ? (
+        <p className="text-sm text-muted">
+          Venue:{" "}
+          <span className="font-medium text-foreground">
+            {selected.locationNote || "Not set"}
+          </span>
+        </p>
+      ) : null}
+
+      {loadingSlots ? (
+        <p className="text-sm text-muted">Loading available times…</p>
+      ) : slotsError ? (
+        <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+          {slotsError}
+        </p>
+      ) : (
+        <SlotCalendarPicker
+          key={`${meetingTypeId}-${state.formKey ?? 0}`}
+          timezone={timezone}
+          candidates={candidates}
+          value={startsAt}
+          onChange={setStartsAt}
+        />
+      )}
+
+      <div className="space-y-4 border-t border-line pt-5">
+        <p className="text-sm font-medium">Invitee</p>
+        <label className="block space-y-1.5">
+          <span className="text-sm font-medium">Name</span>
+          <input
+            name="guestName"
+            className="w-full rounded-md border border-line bg-white px-3 py-2"
+            defaultValue={values.guestName}
+            required
+          />
+        </label>
+        <label className="block space-y-1.5">
+          <span className="text-sm font-medium">Email</span>
+          <input
+            name="guestEmail"
+            type="email"
+            className="w-full rounded-md border border-line bg-white px-3 py-2"
+            defaultValue={values.guestEmail}
+            required
+          />
+        </label>
+        {needsGuestVenue ? (
+          <label className="block space-y-1.5">
+            <span className="text-sm font-medium">
+              Venue (optional — invitee can propose)
+            </span>
+            <input
+              name="venue"
+              className="w-full rounded-md border border-line bg-white px-3 py-2"
+              defaultValue={values.venue}
+              placeholder="Leave blank for invitee to propose"
+            />
+          </label>
+        ) : (
+          <input type="hidden" name="venue" value="" />
+        )}
+        <label className="block space-y-1.5">
+          <span className="text-sm font-medium">Notes (optional)</span>
+          <textarea
+            name="notes"
+            rows={3}
+            className="w-full rounded-md border border-line bg-white px-3 py-2"
+            defaultValue={values.notes}
+          />
+        </label>
+      </div>
+
+      {state.error ? (
+        <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+          {state.error}
+        </p>
+      ) : null}
+
+      <button
+        type="submit"
+        disabled={pending || !startsAt || loadingSlots}
+        className="rounded-md bg-accent px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+      >
+        {pending ? "Sending invite…" : "Create booking & send invite"}
+      </button>
+    </form>
+  );
+}

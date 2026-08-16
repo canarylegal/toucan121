@@ -1,0 +1,10 @@
+-- AlterTable
+ALTER TABLE "Host" ADD COLUMN     "facebookUrl" TEXT NOT NULL DEFAULT '',
+ADD COLUMN     "headline" TEXT NOT NULL DEFAULT '',
+ADD COLUMN     "instagramUrl" TEXT NOT NULL DEFAULT '',
+ADD COLUMN     "linkedinUrl" TEXT NOT NULL DEFAULT '',
+ADD COLUMN     "phone" TEXT NOT NULL DEFAULT '',
+ADD COLUMN     "publicEmail" TEXT NOT NULL DEFAULT '',
+ADD COLUMN     "tiktokUrl" TEXT NOT NULL DEFAULT '',
+ADD COLUMN     "xUrl" TEXT NOT NULL DEFAULT '',
+ADD COLUMN     "youtubeUrl" TEXT NOT NULL DEFAULT '';
