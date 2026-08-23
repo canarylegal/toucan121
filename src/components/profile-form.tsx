@@ -16,6 +16,24 @@ import {
   type SocialLinkKey,
 } from "@/components/social-icons";
 import { parseSocialOrder } from "@/lib/social-order";
+import {
+  mergeProfileStackOrder,
+  parseProfileStackOrder,
+  stringifyProfileStackOrder,
+  type ProfileStackEntry,
+} from "@/lib/profile-stack";
+import {
+  resolveProfileTheme,
+  stringifyProfileTheme,
+} from "@/lib/profile-theme";
+import {
+  ProfileLinksManager,
+  ProfileStackEditor,
+} from "@/components/profile-stack-editor";
+import {
+  ProfileThemeEditor,
+  profileThemeFromInitial,
+} from "@/components/profile-theme-editor";
 
 export type { ProfileFormValues };
 
@@ -39,6 +57,27 @@ const SOCIAL_MEDIA_KEYS: SocialLinkKey[] = [
   "youtubeUrl",
 ];
 
+function stackLinks(links: ProfileFormValues["links"]) {
+  return (links ?? []).map((l) => ({
+    id: l.id,
+    title: l.title,
+    url: l.url,
+    active: true as const,
+    iconKey: l.iconKey ?? "link",
+    emoji: l.emoji ?? "",
+  }));
+}
+
+function editorLinks(links: ProfileFormValues["links"]) {
+  return (links ?? []).map((l) => ({
+    id: l.id,
+    title: l.title,
+    url: l.url,
+    iconKey: l.iconKey ?? "link",
+    emoji: l.emoji ?? "",
+  }));
+}
+
 export function ProfileForm({ initial, variant = "page", onSaved }: Props) {
   const router = useRouter();
   const [state, action, pending] = useActionState(
@@ -46,9 +85,75 @@ export function ProfileForm({ initial, variant = "page", onSaved }: Props) {
     { values: initial } satisfies ProfileFormState,
   );
   const values = { ...initial, ...(state.values ?? {}) };
+  const links = initial.links ?? [];
+  const [layoutMode, setLayoutMode] = useState<"BOOK_FIRST" | "LINKS_FIRST">(
+    initial.profileLayoutMode ?? "BOOK_FIRST",
+  );
+  const linksFirst = layoutMode === "LINKS_FIRST";
+  const [profileTheme, setProfileTheme] = useState(() =>
+    profileThemeFromInitial(initial.profileThemeJson),
+  );
   const [socialOrder, setSocialOrder] = useState<SocialLinkKey[]>(() =>
     parseSocialOrder(JSON.stringify(initial.socialOrder ?? [])),
   );
+  const [profileStackOrder, setProfileStackOrder] = useState<ProfileStackEntry[]>(
+    () => {
+      const hostFields = stackHostFields(initial);
+      return mergeProfileStackOrder({
+        saved: parseProfileStackOrder(initial.profileStackOrderJson),
+        host: hostFields,
+        links: stackLinks(links),
+        includeBook:
+          initial.profileLayoutMode === "LINKS_FIRST" &&
+          (initial.bookingEnabled ?? true),
+      });
+    },
+  );
+
+  const linkKey = links
+    .map(
+      (l) =>
+        `${l.id}:${l.title}:${l.url}:${l.iconKey ?? "link"}:${l.emoji ?? ""}`,
+    )
+    .join("|");
+
+  const socialValues = useMemo(
+    () => ({
+      websiteUrl: values.websiteUrl,
+      publicEmail: values.publicEmail,
+      phone: values.phone,
+      linkedinUrl: values.linkedinUrl,
+      facebookUrl: values.facebookUrl,
+      instagramUrl: values.instagramUrl,
+      tiktokUrl: values.tiktokUrl,
+      xUrl: values.xUrl,
+      youtubeUrl: values.youtubeUrl,
+    }),
+    [
+      values.websiteUrl,
+      values.publicEmail,
+      values.phone,
+      values.linkedinUrl,
+      values.facebookUrl,
+      values.instagramUrl,
+      values.tiktokUrl,
+      values.xUrl,
+      values.youtubeUrl,
+    ],
+  );
+
+  useEffect(() => {
+    const hostFields = stackHostFields({ ...initial, socialOrder });
+    setProfileStackOrder((prev) =>
+      mergeProfileStackOrder({
+        saved: prev,
+        host: hostFields,
+        links: stackLinks(links),
+        includeBook:
+          layoutMode === "LINKS_FIRST" && (initial.bookingEnabled ?? true),
+      }),
+    );
+  }, [linkKey, layoutMode, socialOrder, initial, links]);
 
   useEffect(() => {
     if (state.success) {
@@ -62,6 +167,12 @@ export function ProfileForm({ initial, variant = "page", onSaved }: Props) {
       setSocialOrder(parseSocialOrder(JSON.stringify(state.values.socialOrder)));
     }
   }, [state.formKey, state.values?.socialOrder]);
+
+  useEffect(() => {
+    if (state.values?.profileThemeJson) {
+      setProfileTheme(profileThemeFromInitial(state.values.profileThemeJson));
+    }
+  }, [state.formKey, state.values?.profileThemeJson]);
 
   const socialMediaOrder = useMemo(
     () => socialOrder.filter((k) => SOCIAL_MEDIA_KEYS.includes(k)),
@@ -90,8 +201,13 @@ export function ProfileForm({ initial, variant = "page", onSaved }: Props) {
         name="socialOrderJson"
         value={JSON.stringify(socialOrder)}
       />
+      <input
+        type="hidden"
+        name="profileStackOrderJson"
+        value={stringifyProfileStackOrder(profileStackOrder)}
+      />
       <AvatarField
-        savedPath={initial.avatarPath}
+        savedPath={values.avatarPath ?? initial.avatarPath}
         displayName={values.name || initial.name}
       />
 
@@ -237,6 +353,101 @@ export function ProfileForm({ initial, variant = "page", onSaved }: Props) {
         </ul>
       </div>
 
+      <div className="space-y-3 border-t border-line pt-4">
+        <div>
+          <p className="text-sm font-semibold">Profile layout</p>
+          <p className="mt-1 text-xs text-muted">
+            Standard shows meeting types first; Tree is a stacked link page with
+            in-page booking.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-4 text-sm">
+          <label className="flex items-center gap-2">
+            <input
+              type="radio"
+              name="profileLayoutMode"
+              value="BOOK_FIRST"
+              checked={layoutMode === "BOOK_FIRST"}
+              onChange={() => setLayoutMode("BOOK_FIRST")}
+            />
+            Standard layout
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="radio"
+              name="profileLayoutMode"
+              value="LINKS_FIRST"
+              checked={layoutMode === "LINKS_FIRST"}
+              onChange={() => setLayoutMode("LINKS_FIRST")}
+            />
+            Tree layout
+          </label>
+        </div>
+      </div>
+
+      {linksFirst ? (
+        <div className="space-y-3 border-t border-line pt-4">
+          <div>
+            <p className="text-sm font-semibold">Page style</p>
+            <p className="mt-1 text-xs text-muted">
+              Background, accent colour, and button style for your tree layout
+              profile.
+            </p>
+          </div>
+          <ProfileThemeEditor theme={profileTheme} onChange={setProfileTheme} />
+        </div>
+      ) : (
+        <input
+          type="hidden"
+          name="profileThemeJson"
+          value={stringifyProfileTheme(profileTheme)}
+        />
+      )}
+
+      <div className="space-y-3 border-t border-line pt-4">
+        <div>
+          <p className="text-sm font-semibold">Custom links (optional)</p>
+          <p className="mt-1 text-xs text-muted">
+            Up to 20 links — https, mailto, or tel URLs.
+          </p>
+        </div>
+        <ProfileLinksManager
+          links={editorLinks(links)}
+          onLinksChange={() => router.refresh()}
+        />
+      </div>
+
+      <div className="space-y-3 border-t border-line pt-4">
+        <div>
+          <p className="text-sm font-semibold">
+            {linksFirst ? "Button order" : "Custom link order"}
+          </p>
+          <p className="mt-1 text-xs text-muted">
+            {linksFirst
+              ? "Reorder links, contact details, and the book button on your tree profile."
+              : "Reorder custom links shown under your bio."}
+          </p>
+        </div>
+        <ProfileStackEditor
+          entries={
+            linksFirst
+              ? profileStackOrder
+              : profileStackOrder.filter((e) => e.type === "link")
+          }
+          links={editorLinks(links)}
+          socialValues={socialValues}
+          linksFirst={linksFirst}
+          onChange={(next) => {
+            if (linksFirst) {
+              setProfileStackOrder(next);
+              return;
+            }
+            const nonLinks = profileStackOrder.filter((e) => e.type !== "link");
+            setProfileStackOrder([...next, ...nonLinks]);
+          }}
+        />
+      </div>
+
       {state.error ? <p className="text-sm text-red-700">{state.error}</p> : null}
       {state.success ? (
         <p className="text-sm text-accent">{state.success}</p>
@@ -251,6 +462,21 @@ export function ProfileForm({ initial, variant = "page", onSaved }: Props) {
       </button>
     </form>
   );
+}
+
+function stackHostFields(values: ProfileFormValues) {
+  return {
+    websiteUrl: values.websiteUrl,
+    publicEmail: values.publicEmail,
+    phone: values.phone,
+    linkedinUrl: values.linkedinUrl,
+    facebookUrl: values.facebookUrl,
+    instagramUrl: values.instagramUrl,
+    tiktokUrl: values.tiktokUrl,
+    xUrl: values.xUrl,
+    youtubeUrl: values.youtubeUrl,
+    socialOrderJson: JSON.stringify(values.socialOrder),
+  };
 }
 
 function AvatarField({

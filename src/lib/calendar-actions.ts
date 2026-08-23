@@ -12,6 +12,10 @@ import {
 } from "@/lib/calendar/caldav";
 import { encodeCalendarConfig } from "@/lib/calendar/config-secrets";
 import {
+  describeRepublish,
+  republishHostMeetingsToWriteCalendar,
+} from "@/lib/calendar/republish";
+import {
   listOutlookCalendars,
   parseOutlookConfig,
   withValidOutlookAccess,
@@ -121,6 +125,7 @@ async function replacePrimaryConnection(opts: {
       },
     });
   });
+  return republishHostMeetingsToWriteCalendar(opts.hostId);
 }
 
 export async function calendarConnectAction(
@@ -194,14 +199,14 @@ export async function calendarConnectAction(
         };
       }
 
-      await saveCalDavConnection({
+      const copied = await saveCalDavConnection({
         ...creds,
         calendarUrl: selected.url,
         calendarDisplayName: selected.displayName,
       });
 
       return {
-        success: `Connected “${selected.displayName}”`,
+        success: `Connected “${selected.displayName}”.${describeRepublish(copied)}`,
         step: "done",
         formKey,
       };
@@ -300,7 +305,7 @@ async function saveCalDavConnection(config: CalDavConfig) {
   const host = await requireHost();
   await verifyCalDavConfig(config);
 
-  await replacePrimaryConnection({
+  const copied = await replacePrimaryConnection({
     hostId: host.id,
     provider: "CALDAV",
     label: config.calendarDisplayName || "CalDAV",
@@ -308,6 +313,7 @@ async function saveCalDavConnection(config: CalDavConfig) {
   });
 
   revalidateHost(host.slug);
+  return copied;
 }
 
 export async function disconnectCalendarAction() {
@@ -375,7 +381,7 @@ export async function selectOutlookCalendarAction(
       calendarDisplayName: selected.displayName,
     };
 
-    await replacePrimaryConnection({
+    const copied = await replacePrimaryConnection({
       hostId: host.id,
       provider: "OUTLOOK",
       label: selected.displayName || config!.accountEmail || "Outlook",
@@ -383,7 +389,9 @@ export async function selectOutlookCalendarAction(
     });
 
     revalidateHost(host.slug);
-    return { success: `Connected “${selected.displayName}”` };
+    return {
+      success: `Connected “${selected.displayName}”.${describeRepublish(copied)}`,
+    };
   } catch (err) {
     return {
       error:
@@ -500,7 +508,7 @@ export async function selectGoogleCalendarAction(
       calendarDisplayName: selected.displayName,
     };
 
-    await replacePrimaryConnection({
+    const copied = await replacePrimaryConnection({
       hostId: host.id,
       provider: "GOOGLE",
       label: selected.displayName || config!.accountEmail || "Google Calendar",
@@ -508,7 +516,9 @@ export async function selectGoogleCalendarAction(
     });
 
     revalidateHost(host.slug);
-    return { success: `Connected “${selected.displayName}”` };
+    return {
+      success: `Connected “${selected.displayName}”.${describeRepublish(copied)}`,
+    };
   } catch (err) {
     return {
       error:

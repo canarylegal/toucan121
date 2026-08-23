@@ -38,9 +38,17 @@ export async function resolveBookingApproval(opts: {
   initiatedBy: "guest" | "host";
   hostUserId: string;
   guestUserId?: string | null;
+  /** Host-initiated only: skip invitee accept and confirm immediately. */
+  hostAutoConfirm?: boolean;
 }): Promise<ApprovalDecision> {
-  // Host-created invites always wait for the invitee to accept.
   if (opts.initiatedBy === "host") {
+    if (opts.hostAutoConfirm) {
+      return {
+        status: "CONFIRMED",
+        pendingOn: null,
+        reason: "Auto-confirmed by host",
+      };
+    }
     return {
       status: "PENDING",
       pendingOn: "GUEST",

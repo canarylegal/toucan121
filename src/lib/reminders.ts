@@ -41,6 +41,11 @@ export const DEFAULT_REMINDER_PREFS: ReminderPrefs = {
   final: { enabled: true, amount: 24, unit: "HOURS" },
 };
 
+export const DISABLED_REMINDER_PREFS: ReminderPrefs = {
+  recurring: { enabled: false, every: 1, unit: "WEEKS" },
+  final: { enabled: false, amount: 24, unit: "HOURS" },
+};
+
 export function parseReminderPrefs(raw: string | null | undefined): ReminderPrefs {
   try {
     const parsed = raw ? JSON.parse(raw) : {};

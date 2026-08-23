@@ -2,15 +2,20 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { logoutAction } from "@/lib/auth-actions";
+import { EmailVerifyBanner } from "@/components/email-verify-banner";
 import { toggleMeetingTypeAction } from "@/lib/meeting-type-actions";
 import {
   getOptionalHost,
+  isHostingLive,
   requireUserOrRedirect,
 } from "@/lib/current-user";
 import { incomingConnectionCount } from "@/lib/connections";
 import { HostBookingList } from "@/components/host-booking-list";
 import { HostWrapUpList } from "@/components/host-wrap-up-list";
-import { CopyLinkButton } from "@/components/copy-link-button";
+import { HostPastPendingList } from "@/components/host-past-pending-list";
+import { DashHostActions } from "@/components/dash-host-actions";
+import { ProfileLinkActions } from "@/components/profile-link-actions";
+import { VisitorModeBanner } from "@/components/visitor-mode-banner";
 import { ToucanBrand } from "@/components/toucan-brand";
 import { formatSlotLabel } from "@/lib/availability";
 
@@ -26,18 +31,36 @@ export default async function DashPage({
     deletedMeetingType?: string;
     meetingTypeCreated?: string;
     hostingEnabled?: string;
+    hostingPaused?: string;
+    linksEnabled?: string;
+    bookingRequired?: string;
+    verified?: string;
   }>;
 }) {
   const user = await requireUserOrRedirect();
+  const userRecord = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: { hostingPreference: true },
+  });
+  if (!userRecord?.hostingPreference) {
+    redirect("/dash/welcome");
+  }
+
   const host = await getOptionalHost();
   const q = await searchParams;
+
+  if (userRecord.hostingPreference === "LINKS" && !host) {
+    redirect("/dash/links/setup");
+  }
+
   const incomingConnections = await incomingConnectionCount(user.id);
   const connectionsLabel =
     incomingConnections > 0
       ? `Connections (${incomingConnections})`
       : "Connections";
 
-  if (!host) {
+  if (!isHostingLive(host)) {
+    const paused = Boolean(host);
     const visits = await prisma.booking.findMany({
       where: { guestEmail: { equals: user.email, mode: "insensitive" } },
       orderBy: { startsAt: "desc" },
@@ -47,6 +70,35 @@ export default async function DashPage({
         meetingType: { select: { title: true } },
       },
     });
+
+    const now = new Date();
+    const hostUpcoming =
+      paused && host
+        ? await prisma.booking.findMany({
+            where: {
+              hostId: host.id,
+              status: { in: ["PENDING", "CONFIRMED"] },
+              endsAt: { gt: now },
+            },
+            orderBy: { startsAt: "asc" },
+            take: 15,
+            include: { meetingType: { select: { title: true } } },
+          })
+        : [];
+
+    const hostPastPending =
+      paused && host
+        ? await prisma.booking.findMany({
+            where: {
+              hostId: host.id,
+              status: "PENDING",
+              endsAt: { lte: now },
+            },
+            orderBy: { endsAt: "desc" },
+            take: 20,
+            include: { meetingType: { select: { title: true } } },
+          })
+        : [];
 
     return (
       <main className="mx-auto w-full max-w-xl px-6 py-12">
@@ -64,18 +116,36 @@ export default async function DashPage({
         <h1 className="mt-4 font-serif text-4xl tracking-tight">
           Hello, {user.name}
         </h1>
-        <p className="mt-2 text-muted">
-          Your account is ready. Book others as a visitor, or start hosting
-          when you want a public profile page.
-        </p>
+        {user.emailVerified ? null : <EmailVerifyBanner />}
+        <VisitorModeBanner variant={paused ? "paused" : "visitor"} />
+        {q.verified === "1" ? (
+          <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+            Email confirmed.
+          </p>
+        ) : null}
+        {q.hostingPaused === "1" ? (
+          <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+            Hosting paused — your public profile is hidden.
+          </p>
+        ) : null}
 
         <div className="mt-8 flex flex-wrap gap-3">
-          <Link
-            href="/dash/hosting/setup"
-            className="rounded-md bg-accent px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90"
-          >
-            Start hosting
-          </Link>
+          {!paused ? (
+            <>
+              <Link
+                href="/dash/links/setup"
+                className="rounded-md bg-accent px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90"
+              >
+                Create links profile
+              </Link>
+              <Link
+                href="/dash/hosting/setup"
+                className="rounded-md border border-line bg-panel px-4 py-2.5 text-sm font-semibold hover:bg-accent-soft"
+              >
+                Start full hosting
+              </Link>
+            </>
+          ) : null}
           <Link
             href="/dash/visits"
             className="rounded-md border border-line bg-panel px-4 py-2.5 text-sm font-semibold hover:bg-accent-soft"
@@ -88,7 +158,32 @@ export default async function DashPage({
           >
             {connectionsLabel}
           </Link>
+          <Link
+            href="/dash/account"
+            className="rounded-md border border-line bg-panel px-4 py-2.5 text-sm font-semibold hover:bg-accent-soft"
+          >
+            Account
+          </Link>
         </div>
+
+        {paused && host ? (
+          <>
+            <HostPastPendingList
+              bookings={hostPastPending}
+              timezone={host.timezone}
+            />
+            <section className="mt-10 rounded-lg border border-line bg-panel p-5">
+              <h2 className="text-lg font-semibold">
+                Upcoming meetings you&apos;re hosting
+              </h2>
+              <HostBookingList
+                bookings={hostUpcoming}
+                timezone={host.timezone}
+                empty="Nothing upcoming."
+              />
+            </section>
+          </>
+        ) : null}
 
         <section className="mt-10 rounded-lg border border-line bg-panel p-5">
           <div className="flex items-center justify-between gap-3">
@@ -127,11 +222,121 @@ export default async function DashPage({
     );
   }
 
+  if (!host!.bookingEnabled) {
+    const appUrl = process.env.APP_URL ?? "http://localhost:3000";
+    const profileUrl = `${appUrl}/${host!.slug}`;
+    const visits = await prisma.booking.findMany({
+      where: { guestEmail: { equals: user.email, mode: "insensitive" } },
+      orderBy: { startsAt: "desc" },
+      take: 8,
+      include: {
+        host: { select: { name: true, slug: true, timezone: true } },
+        meetingType: { select: { title: true } },
+      },
+    });
+
+    return (
+      <main className="mx-auto w-full max-w-xl px-6 py-12">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <ToucanBrand />
+          <form action={logoutAction}>
+            <button
+              type="submit"
+              className="text-sm font-medium text-muted underline hover:text-foreground"
+            >
+              Sign out
+            </button>
+          </form>
+        </div>
+        <h1 className="mt-4 font-serif text-4xl tracking-tight">
+          Hello, {host!.name}
+        </h1>
+        <p className="mt-2 max-w-xl text-muted">
+          Your links profile is live — booking is off.
+        </p>
+        {user.emailVerified ? null : <EmailVerifyBanner />}
+        <VisitorModeBanner variant="links" />
+        {q.verified === "1" ? (
+          <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+            Email confirmed.
+          </p>
+        ) : null}
+        {q.linksEnabled === "1" ? (
+          <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+            Links profile published — share your profile link.
+          </p>
+        ) : null}
+        {q.bookingRequired === "1" ? (
+          <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+            That page needs booking to be activated on your account.
+          </p>
+        ) : null}
+
+        <div className="mt-6 border-l-4 border-accent bg-accent-soft/50 px-5 py-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent">
+            Profile page
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <p className="min-w-0 flex-1 break-all font-serif text-xl tracking-tight sm:text-2xl">
+              <Link
+                href={`/${host!.slug}`}
+                className="text-foreground underline decoration-accent/40 underline-offset-4 hover:decoration-accent"
+              >
+                {profileUrl}
+              </Link>
+            </p>
+            <ProfileLinkActions url={profileUrl} slug={host!.slug} />
+          </div>
+        </div>
+
+        <DashHostActions
+          hostSlug={host!.slug}
+          connectionsLabel={connectionsLabel}
+          bookingEnabled={false}
+        />
+
+        <section className="mt-10 rounded-lg border border-line bg-panel p-5">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold">Recent bookings</h2>
+            <Link
+              href="/dash/visits"
+              className="text-sm font-medium text-accent underline"
+            >
+              View all
+            </Link>
+          </div>
+          {visits.length === 0 ? (
+            <p className="mt-3 text-sm text-muted">
+              No bookings yet. When you book someone&apos;s profile page with
+              this email, they show up here.
+            </p>
+          ) : (
+            <ul className="mt-3 space-y-3 text-sm">
+              {visits.map((b) => (
+                <li
+                  key={b.id}
+                  className="border-b border-line pb-3 last:border-0 last:pb-0"
+                >
+                  <p className="font-medium">
+                    {b.meetingType.title} with {b.host.name}
+                  </p>
+                  <p className="text-muted">
+                    {formatSlotLabel(b.startsAt, b.host.timezone)} · {b.status}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </main>
+    );
+  }
+
+  const hostId = host!.id;
   const now = new Date();
-  const hostId = host.id;
   const since30Days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-  const [hostFull, wrapUp, upcoming, recent, cancelledList] =
+  const [hostFull, wrapUp, pastPending, upcoming, recent, cancelledList] =
     await Promise.all([
       prisma.host.findUnique({
         where: { id: hostId },
@@ -155,6 +360,16 @@ export default async function DashPage({
       prisma.booking.findMany({
         where: {
           hostId,
+          status: "PENDING",
+          endsAt: { lte: now },
+        },
+        orderBy: { endsAt: "desc" },
+        take: 20,
+        include: { meetingType: { select: { title: true } } },
+      }),
+      prisma.booking.findMany({
+        where: {
+          hostId,
           status: { in: ["PENDING", "CONFIRMED"] },
           endsAt: { gt: now },
         },
@@ -165,11 +380,8 @@ export default async function DashPage({
       prisma.booking.findMany({
         where: {
           hostId,
+          status: "COMPLETED",
           endsAt: { gte: since30Days },
-          OR: [
-            { status: "COMPLETED" },
-            { status: "PENDING", endsAt: { lte: now } },
-          ],
         },
         orderBy: [{ completedAt: "desc" }, { startsAt: "desc" }],
         take: 50,
@@ -192,7 +404,8 @@ export default async function DashPage({
   }
 
   const appUrl = process.env.APP_URL ?? "http://localhost:3000";
-  const booked = q.booked === "1";
+  const bookedPending = q.booked === "1" || q.booked === "pending";
+  const bookedConfirmed = q.booked === "confirmed";
   const rescheduled = q.rescheduled === "1";
   const cancelled = q.cancelled === "1";
   const deletedMeetingType = q.deletedMeetingType === "1";
@@ -220,15 +433,26 @@ export default async function DashPage({
       <p className="mt-2 max-w-xl text-muted">
         Your public profile page is live.
       </p>
+      {user.emailVerified ? null : <EmailVerifyBanner />}
+      {q.verified === "1" ? (
+        <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+          Email confirmed.
+        </p>
+      ) : null}
 
       {hostingEnabled ? (
         <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
           Hosting enabled — connect a calendar and share your profile link.
         </p>
       ) : null}
-      {booked ? (
+      {bookedPending ? (
         <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
           Invitation sent — pending until the invitee accepts.
+        </p>
+      ) : null}
+      {bookedConfirmed ? (
+        <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+          Booking confirmed — visitor emailed.
         </p>
       ) : null}
       {rescheduled ? (
@@ -265,49 +489,19 @@ export default async function DashPage({
               {bookingUrl}
             </Link>
           </p>
-          <CopyLinkButton value={bookingUrl} />
+          <ProfileLinkActions url={bookingUrl} slug={hostFull.slug} />
         </div>
       </div>
 
-      <div className="mt-6 flex flex-wrap gap-3">
-        <Link
-          href="/dash/bookings/new"
-          className="rounded-md bg-accent px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90"
-        >
-          New booking
-        </Link>
-        <Link
-          href="/dash/meetings/new"
-          className="rounded-md border border-line bg-panel px-4 py-2.5 text-sm font-semibold hover:bg-accent-soft"
-        >
-          Add meeting type
-        </Link>
-        <Link
-          href={`/${hostFull.slug}?edit=1`}
-          className="rounded-md border border-line bg-panel px-4 py-2.5 text-sm font-semibold hover:bg-accent-soft"
-        >
-          Edit profile
-        </Link>
-        <Link
-          href="/dash/schedule"
-          className="rounded-md border border-line bg-panel px-4 py-2.5 text-sm font-semibold hover:bg-accent-soft"
-        >
-          View schedule
-        </Link>
-        <Link
-          href="/dash/calendar"
-          className="rounded-md border border-line bg-panel px-4 py-2.5 text-sm font-semibold hover:bg-accent-soft"
-        >
-          Connect calendar
-        </Link>
-        <Link
-          href="/dash/connections"
-          className="rounded-md border border-line bg-panel px-4 py-2.5 text-sm font-semibold hover:bg-accent-soft"
-        >
-          {connectionsLabel}
-        </Link>
-      </div>
+      <DashHostActions
+        hostSlug={hostFull.slug}
+        connectionsLabel={connectionsLabel}
+      />
 
+      <HostPastPendingList
+        bookings={pastPending}
+        timezone={hostFull.timezone}
+      />
       <HostWrapUpList bookings={wrapUp} timezone={hostFull.timezone} />
 
       <div className="mt-8 grid gap-4 lg:grid-cols-2 xl:grid-cols-4">

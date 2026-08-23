@@ -101,8 +101,8 @@ async function getHostLocalScheduleInRange(opts: {
     items.push({
       id: `booking-${b.id}`,
       source: "booking",
-      title: b.meetingType.title,
-      subtitle: `${b.guestName} · ${statusLabel}`,
+      title: b.guestName,
+      subtitle: `${b.meetingType.title} · ${statusLabel}`,
       startsAt: b.startsAt.toISOString(),
       endsAt: b.endsAt.toISOString(),
       dayKey: dayKeyInZone(b.startsAt, opts.timezone),

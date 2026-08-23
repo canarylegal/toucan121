@@ -12,6 +12,7 @@ import {
   removeConnectionAction,
 } from "@/lib/connection-actions";
 import { ConnectionLookupForm } from "@/components/connection-lookup-form";
+import { EmailVerifyBanner } from "@/components/email-verify-banner";
 import { ToucanBrand } from "@/components/toucan-brand";
 
 export const dynamic = "force-dynamic";
@@ -47,13 +48,19 @@ export default async function ConnectionsPage() {
         <div className="space-y-6">
           <section className="rounded-lg border border-line bg-panel p-5">
             <h2 className="text-lg font-semibold">Add a connection</h2>
-            <p className="mt-1 text-sm text-muted">
-              Request by account email, or by someone&apos;s public profile path.
-              You can also tap Add as connection on a profile page.
-            </p>
-            <div className="mt-4">
-              <ConnectionLookupForm />
-            </div>
+            {user.emailVerified ? (
+              <>
+                <p className="mt-1 text-sm text-muted">
+                  Request by account email, or by someone&apos;s public profile
+                  path. You can also tap Add as connection on a profile page.
+                </p>
+                <div className="mt-4">
+                  <ConnectionLookupForm />
+                </div>
+              </>
+            ) : (
+              <EmailVerifyBanner />
+            )}
           </section>
 
           <ConnectionSection

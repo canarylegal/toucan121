@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import Link from "next/link";
+import { APP_NAME } from "@/lib/brand";
 import {
   loginAction,
   signupAction,
@@ -54,6 +55,16 @@ export function SignupForm({ callbackUrl }: { callbackUrl?: string }) {
       />
 
       {state.error ? <p className="text-sm text-red-700">{state.error}</p> : null}
+
+      <p className="text-xs leading-relaxed text-muted">
+        By creating an account you agree we may email you about your{" "}
+        {APP_NAME} account (verification, password resets, and connection
+        notices). See our{" "}
+        <Link href="/privacy" className="font-medium text-accent underline">
+          privacy policy
+        </Link>
+        .
+      </p>
 
       <button
         type="submit"
@@ -108,6 +119,12 @@ export function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
       >
         {pending ? "Signing in…" : "Sign in"}
       </button>
+
+      <p className="text-center text-sm text-muted">
+        <Link href="/forgot" className="font-medium text-accent underline">
+          Forgot password?
+        </Link>
+      </p>
 
       <p className="text-center text-sm text-muted">
         New here?{" "}

@@ -172,7 +172,7 @@ export function SlotCalendarPicker({
               No bookable times on this day (outside working hours).
             </p>
           ) : (
-            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+            <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
               {daySlots.map((slot) => {
                 const selected = value === slot.value;
                 if (!slot.available) {

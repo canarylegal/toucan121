@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { sendEmail } from "@/lib/email";
+import { sendAuthEmail } from "@/lib/email";
 import { renderNoticeEmail } from "@/lib/email-templates";
 import { APP_NAME } from "@/lib/brand";
 
@@ -180,7 +180,7 @@ async function notifyConnectionRequest(opts: {
     primaryCta: { label: "Review request", url },
     footerNote: "You can ignore this if you do not want to connect.",
   });
-  await sendEmail({
+  await sendAuthEmail({
     to: opts.toEmail,
     subject: mail.subject,
     text: mail.text,
@@ -201,7 +201,7 @@ async function notifyConnectionAccepted(opts: {
     intro: `${opts.fromName} accepted your connection request on ${APP_NAME}.`,
     primaryCta: { label: "View connections", url },
   });
-  await sendEmail({
+  await sendAuthEmail({
     to: opts.toEmail,
     subject: mail.subject,
     text: mail.text,
@@ -223,7 +223,7 @@ export async function requestConnection(opts: {
 
   const from = await prisma.user.findUnique({
     where: { id: opts.fromUserId },
-    select: { id: true, name: true, email: true },
+    select: { id: true, name: true, email: true, emailVerifiedAt: true },
   });
   const to = await prisma.user.findUnique({
     where: { id: opts.toUserId },
@@ -231,6 +231,12 @@ export async function requestConnection(opts: {
   });
   if (!from || !to) {
     return { ok: false, error: "Account not found" };
+  }
+  if (!from.emailVerifiedAt) {
+    return {
+      ok: false,
+      error: "Confirm your email before adding connections.",
+    };
   }
 
   const { low, high } = orderedUserIds(from.id, to.id);

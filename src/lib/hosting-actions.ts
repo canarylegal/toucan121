@@ -36,10 +36,18 @@ export async function enableHostingAction(
 
   try {
     const user = await requireUser();
+    if (!user.emailVerified) {
+      return {
+        error:
+          "Confirm your email before you start hosting — check your inbox.",
+        values,
+        formKey,
+      };
+    }
     const existing = await prisma.host.findUnique({
       where: { userId: user.id },
     });
-    if (existing) {
+    if (existing?.hostingActive && existing.bookingEnabled) {
       redirect("/dash");
     }
 

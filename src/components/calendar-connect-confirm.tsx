@@ -22,7 +22,8 @@ export function CalendarConnectConfirm({
           won’t be offered for booking.
         </li>
         <li>
-          New confirmed Toucan 121 bookings will be written to this calendar.
+          Upcoming confirmed and pending Toucan 121 bookings, plus blocked
+          times, will be copied here. New bookings will be written here too.
         </li>
       </ul>
       <label className="flex cursor-pointer items-start gap-2.5 text-sm">

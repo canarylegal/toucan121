@@ -27,6 +27,7 @@ export async function GET(request: Request) {
       meetingTypeId,
       allowInactive: true,
       excludeBookingId: excludeBookingId || undefined,
+      ignoreAvailabilityWindows: true,
     });
 
     return NextResponse.json({

@@ -8,6 +8,10 @@ import {
   stringifySocialOrder,
 } from "@/lib/social-order";
 import type { SocialLinkKey } from "@/components/social-icons";
+import {
+  parseProfileTheme,
+  stringifyProfileTheme,
+} from "@/lib/profile-theme";
 
 const ALLOWED_TYPES: Record<string, string> = {
   "image/jpeg": ".jpg",
@@ -36,7 +40,18 @@ export const profileSchema = z.object({
   name: z.string().trim().min(1).max(80),
   headline: z.string().trim().max(120),
   businessName: z.string().trim().max(120),
-  bio: z.string().trim().max(600),
+  bio: z
+    .string()
+    .trim()
+    .max(600)
+    .transform((v) =>
+      v
+        .replace(/\r\n/g, "\n")
+        .split("\n")
+        .map((line) => line.trimEnd())
+        .join("\n")
+        .trim(),
+    ),
   websiteUrl: optionalUrl,
   publicEmail: optionalEmail,
   phone: z.string().trim().max(40),
@@ -47,6 +62,14 @@ export const profileSchema = z.object({
   xUrl: optionalUrl,
   youtubeUrl: optionalUrl,
   socialOrderJson: z.string().trim().max(500).default("[]"),
+  profileLayoutMode: z.enum(["BOOK_FIRST", "LINKS_FIRST"]).default("BOOK_FIRST"),
+  profileStackOrderJson: z.string().trim().max(4000).default("[]"),
+  profileThemeJson: z
+    .string()
+    .trim()
+    .max(500)
+    .default("{}")
+    .transform((raw) => stringifyProfileTheme(parseProfileTheme(raw))),
   timezone: z
     .string()
     .trim()
@@ -74,17 +97,38 @@ export type ProfileFormValues = {
   xUrl: string;
   youtubeUrl: string;
   socialOrder: SocialLinkKey[];
+  profileLayoutMode: "BOOK_FIRST" | "LINKS_FIRST";
+  profileStackOrderJson: string;
+  profileThemeJson: string;
+  links?: {
+    id: string;
+    title: string;
+    url: string;
+    iconKey?: string;
+    emoji?: string;
+  }[];
   timezone: string;
   bookingHorizonDays: number;
   avatarPath: string | null;
+  bookingEnabled?: boolean;
 };
 
 function avatarsDir() {
   return path.join(process.cwd(), "public", "uploads", "avatars");
 }
 
+function avatarExtension(file: File): string | null {
+  const fromType = ALLOWED_TYPES[file.type];
+  if (fromType) return fromType;
+  const name = file.name.trim().toLowerCase();
+  if (name.endsWith(".jpg") || name.endsWith(".jpeg")) return ".jpg";
+  if (name.endsWith(".png")) return ".png";
+  if (name.endsWith(".webp")) return ".webp";
+  return null;
+}
+
 async function saveAvatar(hostId: string, file: File): Promise<string> {
-  const ext = ALLOWED_TYPES[file.type];
+  const ext = avatarExtension(file);
   if (!ext) {
     throw new Error("Photo must be a JPEG, PNG, or WebP image");
   }
@@ -157,6 +201,9 @@ export async function updateHostProfile(opts: {
         socialOrderJson: stringifySocialOrder(
           parseSocialOrder(data.socialOrderJson),
         ),
+        profileLayoutMode: data.profileLayoutMode,
+        profileStackOrderJson: data.profileStackOrderJson,
+        profileThemeJson: data.profileThemeJson,
         timezone: data.timezone,
         bookingHorizonDays: data.bookingHorizonDays,
         avatarPath,

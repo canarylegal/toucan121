@@ -33,3 +33,52 @@ body {
 a {
   color: inherit;
 }
+
+/* Links-first profile themes */
+.profile-themed {
+  background-color: var(--profile-bg);
+  color: var(--profile-fg);
+}
+
+.profile-bg-gradient-mint {
+  background:
+    radial-gradient(1200px 600px at 10% -10%, #e7f3ec 0%, transparent 55%),
+    radial-gradient(900px 500px at 100% 0%, #d7ebe2 0%, transparent 50%),
+    var(--profile-bg);
+}
+
+.profile-bg-gradient-warm {
+  background:
+    radial-gradient(1200px 600px at 10% -10%, #efe6d4 0%, transparent 55%),
+    radial-gradient(900px 500px at 100% 0%, #f3efe6 0%, transparent 50%),
+    var(--profile-bg);
+}
+
+.profile-bg-paper {
+  background-color: var(--profile-bg);
+  background-image:
+  repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.02) 2px,
+    rgba(0, 0, 0, 0.02) 4px
+  );
+}
+
+.profile-bg-grain {
+  background-color: var(--profile-bg);
+  background-image:
+    radial-gradient(rgba(0, 0, 0, 0.04) 0.6px, transparent 0.6px);
+  background-size: 4px 4px;
+}
+
+/* Toucan app UI inside profile themes — reset inherited profile text colour */
+.profile-editor-surface,
+.profile-booking-surface {
+  color: var(--foreground);
+}
+
+.profile-editor-surface {
+  background-color: var(--background);
+}

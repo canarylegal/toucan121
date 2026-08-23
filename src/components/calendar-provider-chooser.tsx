@@ -18,8 +18,8 @@ export function CalendarProviderChooser({
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted">
-        Connect one calendar for busy times and bookings. You can switch
-        providers later.
+        Connect one calendar for busy times and bookings. Switching later
+        copies upcoming Toucan bookings onto the new calendar.
       </p>
       <ul className="space-y-2">
         <li>

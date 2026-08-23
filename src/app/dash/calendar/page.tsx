@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ComponentProps } from "react";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { requireHostOrRedirect } from "@/lib/current-user";
+import { requireBookingHostOrRedirect } from "@/lib/current-user";
 import {
   ensureHostCalendarSecretsEncrypted,
   parseCalDavConfig,
@@ -31,7 +31,7 @@ export default async function HostCalendarPage({
 }: {
   searchParams: SearchParams;
 }) {
-  const sessionHost = await requireHostOrRedirect();
+  const sessionHost = await requireBookingHostOrRedirect();
   const params = await searchParams;
 
   const host = await prisma.host.findUnique({

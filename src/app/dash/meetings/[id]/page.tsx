@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { requireHostOrRedirect } from "@/lib/current-user";
+import { requireBookingHostOrRedirect } from "@/lib/current-user";
 import { parseAvailabilityJson } from "@/lib/availability";
 import { parseApprovalRules } from "@/lib/approval";
 import { parseReminderPrefs } from "@/lib/reminders";
@@ -20,7 +20,7 @@ export default async function EditMeetingTypePage({
 }) {
   const { id } = await params;
   const { error } = await searchParams;
-  const host = await requireHostOrRedirect();
+  const host = await requireBookingHostOrRedirect();
 
   const meetingType = await prisma.meetingType.findFirst({
     where: { id, hostId: host.id, deletedAt: null },

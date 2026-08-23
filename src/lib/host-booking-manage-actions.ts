@@ -32,11 +32,13 @@ export async function completeBookingAction(formData: FormData) {
     where: { id: bookingId, hostId },
   });
   if (!booking) throw new Error("Booking not found");
-  if (booking.status !== "CONFIRMED") {
-    throw new Error("Only confirmed meetings can be completed");
-  }
-  if (booking.endsAt > new Date()) {
+  const now = new Date();
+  if (booking.endsAt > now) {
     throw new Error("This meeting has not ended yet");
+  }
+  // Ended CONFIRMED (wrap-up) or ended PENDING (never accepted — host says it happened).
+  if (booking.status !== "CONFIRMED" && booking.status !== "PENDING") {
+    throw new Error("Only confirmed or past unconfirmed meetings can be completed");
   }
 
   await prisma.booking.update({
@@ -47,6 +49,8 @@ export async function completeBookingAction(formData: FormData) {
       actionPoints: stringifyActionPoints(points),
       actionPointsDone: actionPointsAllDone(points),
       pendingOn: null,
+      // If it was never confirmed, treat completion as confirmation for history.
+      confirmedAt: booking.confirmedAt ?? now,
     },
   });
   await cancelPendingReminders(booking.id);

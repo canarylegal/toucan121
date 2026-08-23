@@ -3,6 +3,12 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // Slim production image for TrueNAS / Docker (copies server + static assets).
   output: "standalone",
+  experimental: {
+    // Profile photos up to 2 MB; allow a little headroom for multipart encoding.
+    serverActions: {
+      bodySizeLimit: "3mb",
+    },
+  },
   // Allow HMR / dev assets when using the public Cloudflare hostname in development.
   allowedDevOrigins: ["toucan121.co.uk", "www.toucan121.co.uk"],
   async redirects() {

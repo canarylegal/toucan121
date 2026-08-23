@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { requireHostOrRedirect } from "@/lib/current-user";
+import { requireBookingHostOrRedirect } from "@/lib/current-user";
 import { listSlotsForMeetingType } from "@/lib/booking";
 import { dayKeyInZone, formatSlotLabel, formatSlotTime } from "@/lib/availability";
 import { HostRescheduleForm } from "@/components/host-reschedule-form";
@@ -14,7 +14,7 @@ export default async function HostReschedulePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const host = await requireHostOrRedirect();
+  const host = await requireBookingHostOrRedirect();
 
   const booking = await prisma.booking.findFirst({
     where: { id, hostId: host.id },
@@ -29,6 +29,7 @@ export default async function HostReschedulePage({
     meetingTypeId: booking.meetingTypeId,
     allowInactive: true,
     excludeBookingId: booking.id,
+    ignoreAvailabilityWindows: true,
   });
 
   const slotCandidates = candidates.map((c) => ({
@@ -49,7 +50,7 @@ export default async function HostReschedulePage({
       <p className="mt-2 text-muted">
         {wasCancelled
           ? "Pick a new time to reactivate this meeting. The guest will be emailed a confirmed invite."
-          : "Pick a new time. The guest will be emailed the update."}
+          : "Pick a new time. You can use a slot outside your usual hours if it is not already booked. The guest will be emailed the update."}
       </p>
 
       <div className="mt-8 rounded-lg border border-line bg-panel p-5">

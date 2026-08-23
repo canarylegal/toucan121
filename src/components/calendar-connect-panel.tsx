@@ -124,7 +124,8 @@ export function CalendarConnectPanel({
             <p className="mt-1 text-muted">{connected.accountEmail}</p>
           ) : null}
           <p className="mt-2 text-xs text-muted">
-            Bookings are written here and existing events block availability.
+            Upcoming bookings are written here and existing events block
+            availability.
           </p>
         </div>
         <form action={disconnectCalendarAction}>

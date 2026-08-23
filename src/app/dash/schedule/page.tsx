@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { requireHostOrRedirect } from "@/lib/current-user";
+import { requireBookingHostOrRedirect } from "@/lib/current-user";
 import {
   currentDayKey,
   currentMonthKey,
@@ -28,7 +28,7 @@ export default async function HostSchedulePage({
     month?: string;
   }>;
 }) {
-  const sessionHost = await requireHostOrRedirect();
+  const sessionHost = await requireBookingHostOrRedirect();
 
   const host = await prisma.host.findUnique({
     where: { id: sessionHost.id },

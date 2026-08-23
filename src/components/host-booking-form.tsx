@@ -37,6 +37,8 @@ export function HostBookingForm({
       notes: "",
       startsAt: "",
       venue: "",
+      confirmMode: "ask",
+      sendReminders: "1",
     },
   } satisfies HostBookingFormState);
 
@@ -47,10 +49,18 @@ export function HostBookingForm({
     notes: "",
     startsAt: "",
     venue: "",
+    confirmMode: "ask" as const,
+    sendReminders: "1" as const,
   };
 
   const [meetingTypeId, setMeetingTypeId] = useState(values.meetingTypeId);
   const [startsAt, setStartsAt] = useState(values.startsAt);
+  const [confirmMode, setConfirmMode] = useState<"ask" | "auto">(
+    values.confirmMode ?? "ask",
+  );
+  const [sendReminders, setSendReminders] = useState(
+    (values.sendReminders ?? "1") === "1",
+  );
   const [candidates, setCandidates] = useState<BookingSlotCandidate[]>([]);
   const [slotsError, setSlotsError] = useState<string | null>(null);
   const [loadingSlots, setLoadingSlots] = useState(false);
@@ -189,6 +199,78 @@ export function HostBookingForm({
         </label>
       </div>
 
+      <div className="space-y-4 border-t border-line pt-5">
+        <fieldset className="space-y-2">
+          <legend className="text-sm font-medium">Confirmation</legend>
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="radio"
+              name="confirmMode"
+              value="ask"
+              checked={confirmMode === "ask"}
+              onChange={() => setConfirmMode("ask")}
+              className="mt-1"
+            />
+            <span>
+              Ask visitor to confirm
+              <span className="block text-muted">
+                Sends an invite — pending until they accept.
+              </span>
+            </span>
+          </label>
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="radio"
+              name="confirmMode"
+              value="auto"
+              checked={confirmMode === "auto"}
+              onChange={() => setConfirmMode("auto")}
+              className="mt-1"
+            />
+            <span>
+              Auto-confirm
+              <span className="block text-muted">
+                Confirms now and emails the visitor a booking confirmation.
+              </span>
+            </span>
+          </label>
+        </fieldset>
+
+        <fieldset className="space-y-2">
+          <legend className="text-sm font-medium">Visitor reminders</legend>
+          <input
+            type="hidden"
+            name="sendReminders"
+            value={sendReminders ? "1" : "0"}
+          />
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={sendReminders}
+              onChange={(e) => setSendReminders(e.target.checked)}
+              className="mt-1"
+            />
+            <span>
+              Send reminder emails to the visitor
+              <span className="block text-muted">
+                Per booking. Uses this meeting type&apos;s reminder timing when
+                on. Your own host reminders are unchanged. Confirmations and
+                cancellations are always emailed.
+              </span>
+            </span>
+          </label>
+        </fieldset>
+      </div>
+
+      <p className="text-xs leading-relaxed text-muted">
+        The visitor will receive transactional emails about this booking. See
+        our{" "}
+        <a href="/privacy" className="font-medium text-accent underline">
+          privacy policy
+        </a>
+        .
+      </p>
+
       {state.error ? (
         <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
           {state.error}
@@ -200,7 +282,13 @@ export function HostBookingForm({
         disabled={pending || !startsAt || loadingSlots}
         className="rounded-md bg-accent px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
       >
-        {pending ? "Sending invite…" : "Create booking & send invite"}
+        {pending
+          ? confirmMode === "auto"
+            ? "Creating…"
+            : "Sending invite…"
+          : confirmMode === "auto"
+            ? "Create booking"
+            : "Create booking & send invite"}
       </button>
     </form>
   );

@@ -30,6 +30,9 @@ export type SlotCandidate = Slot & {
 /** How far ahead guests can book (rolling window from today). */
 export const BOOKING_HORIZON_DAYS = 60;
 
+/** Start-time grid for bookable slots (independent of meeting duration). */
+export const SLOT_INTERVAL_MINS = 15;
+
 function overlaps(
   aStart: Date,
   aEnd: Date,
@@ -69,6 +72,11 @@ export function generateSlotCandidates(opts: {
   /** Minutes blocked after each candidate. */
   bufferAfterMins?: number;
   now?: Date;
+  /**
+   * Host-initiated booking: offer starts every SLOT_INTERVAL_MINS across
+   * each day, ignoring weekly availability windows. Busy bookings still block.
+   */
+  ignoreAvailabilityWindows?: boolean;
 }): SlotCandidate[] {
   const {
     timezone,
@@ -79,6 +87,7 @@ export function generateSlotCandidates(opts: {
     bufferBeforeMins = 0,
     bufferAfterMins = 0,
     now = new Date(),
+    ignoreAvailabilityWindows = false,
   } = opts;
 
   const candidates: SlotCandidate[] = [];
@@ -87,13 +96,18 @@ export function generateSlotCandidates(opts: {
   for (let d = 0; d < daysAhead; d++) {
     const dayLocal = startOfDay(addDays(nowZoned, d));
     const dow = dayLocal.getDay();
-    const dayWindows = windows.filter((w) => w.day === dow);
+    const dayWindows = ignoreAvailabilityWindows
+      ? [{ day: dow, start: "00:00", end: "24:00" }]
+      : windows.filter((w) => w.day === dow);
 
     for (const window of dayWindows) {
       const [sh, sm] = window.start.split(":").map(Number);
       const [eh, em] = window.end.split(":").map(Number);
-      let cursor = setMinutes(setHours(dayLocal, sh), sm);
-      const windowEnd = setMinutes(setHours(dayLocal, eh), em);
+      let cursor = setMinutes(setHours(dayLocal, sh ?? 0), sm ?? 0);
+      const windowEnd =
+        eh === 24 && (em ?? 0) === 0
+          ? addDays(dayLocal, 1)
+          : setMinutes(setHours(dayLocal, eh ?? 0), em ?? 0);
 
       while (addMinutes(cursor, durationMins) <= windowEnd) {
         const startsLocal = cursor;
@@ -123,7 +137,7 @@ export function generateSlotCandidates(opts: {
           available: !past && !conflict,
           reason: past ? "past" : conflict ? "busy" : undefined,
         });
-        cursor = addMinutes(cursor, durationMins);
+        cursor = addMinutes(cursor, SLOT_INTERVAL_MINS);
       }
     }
   }
@@ -141,6 +155,7 @@ export function generateSlots(opts: {
   bufferBeforeMins?: number;
   bufferAfterMins?: number;
   now?: Date;
+  ignoreAvailabilityWindows?: boolean;
 }): Slot[] {
   return generateSlotCandidates(opts)
     .filter((c) => c.available)

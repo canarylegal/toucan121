@@ -22,6 +22,7 @@ import { APP_NAME } from "@/lib/brand";
 import { resolveMeetingVideoUrl } from "@/lib/jitsi";
 import { resolveBookingApproval } from "@/lib/approval";
 import {
+  DISABLED_REMINDER_PREFS,
   parseReminderPrefs,
   reminderPrefsSchema,
   stringifyReminderPrefs,
@@ -95,13 +96,23 @@ function whenLine(booking: Booking, timezone: string) {
   return formatEmailWhen(booking.startsAt, timezone);
 }
 
-export async function getHostBySlug(slug: string) {
-  return prisma.host.findUnique({
-    where: { slug },
+export async function getHostBySlug(
+  slug: string,
+  opts?: { includePaused?: boolean },
+) {
+  return prisma.host.findFirst({
+    where: {
+      slug,
+      ...(opts?.includePaused ? {} : { hostingActive: true }),
+    },
     include: {
       meetingTypes: {
         where: { active: true, deletedAt: null },
         orderBy: { title: "asc" },
+      },
+      links: {
+        where: { active: true },
+        orderBy: { createdAt: "asc" },
       },
     },
   });
@@ -120,6 +131,9 @@ async function loadMeetingContext(opts: {
       ? await prisma.host.findUnique({ where: { slug: opts.hostSlug } })
       : null;
   if (!host) throw new Error("Host not found");
+  if (!host.hostingActive || !host.bookingEnabled) {
+    throw new Error("Booking is not available for this profile");
+  }
 
   const meetingType = opts.meetingTypeId
     ? await prisma.meetingType.findFirst({
@@ -151,6 +165,8 @@ export async function listSlotsForMeetingType(opts: {
   allowInactive?: boolean;
   /** Ignore this booking when computing busy (reschedule). */
   excludeBookingId?: string;
+  /** Host booking/reschedule: ignore weekly hours, still block overlaps. */
+  ignoreAvailabilityWindows?: boolean;
 }) {
   const { host, meetingType } = await loadMeetingContext(opts);
 
@@ -219,6 +235,7 @@ export async function listSlotsForMeetingType(opts: {
     busy,
     bufferBeforeMins: meetingType.bufferBefore,
     bufferAfterMins: meetingType.bufferAfter,
+    ignoreAvailabilityWindows: opts.ignoreAvailabilityWindows,
   });
   const slots = candidates
     .filter((c) => c.available)
@@ -759,6 +776,7 @@ export async function rescheduleBooking(opts: {
     meetingTypeId: booking.meetingTypeId,
     allowInactive: true,
     excludeBookingId: booking.id,
+    ignoreAvailabilityWindows: true,
   });
 
   const match = slots.find((s) => s.startsAt.getTime() === startsAt.getTime());
@@ -940,6 +958,10 @@ export async function createBooking(opts: {
   initiatedBy?: "guest" | "host";
   allowInactiveMeetingType?: boolean;
   guestUserId?: string | null;
+  /** Host-initiated: confirm without invitee accept. */
+  hostAutoConfirm?: boolean;
+  /** Host-initiated: when false, disable visitor reminder emails for this booking. Host reminders still use meeting-type defaults. */
+  sendReminders?: boolean;
 }) {
   const initiatedBy = opts.initiatedBy ?? "guest";
   const parsed = bookSchema.parse(opts.input);
@@ -951,6 +973,7 @@ export async function createBooking(opts: {
     meetingTypeSlug: parsed.meetingTypeSlug,
     meetingTypeId: parsed.meetingTypeId,
     allowInactive: opts.allowInactiveMeetingType,
+    ignoreAvailabilityWindows: initiatedBy === "host",
   });
 
   const match = slots.find((s) => s.startsAt.getTime() === startsAt.getTime());
@@ -965,6 +988,7 @@ export async function createBooking(opts: {
     initiatedBy,
     hostUserId: host.userId,
     guestUserId: opts.guestUserId,
+    hostAutoConfirm: initiatedBy === "host" ? opts.hostAutoConfirm : undefined,
   });
 
   const jitsiUrl = resolveMeetingVideoUrl(meetingType);
@@ -986,9 +1010,14 @@ export async function createBooking(opts: {
   const manageToken = newManageToken();
 
   const snapshots = snapshotReminderPrefsFromMeetingType(meetingType);
-  const guestReminderJson = parsed.guestReminder
-    ? stringifyReminderPrefs(parsed.guestReminder)
-    : snapshots.guestReminderJson;
+  const guestRemindersOff =
+    initiatedBy === "host" && opts.sendReminders === false;
+  const guestReminderJson = guestRemindersOff
+    ? stringifyReminderPrefs(DISABLED_REMINDER_PREFS)
+    : parsed.guestReminder
+      ? stringifyReminderPrefs(parsed.guestReminder)
+      : snapshots.guestReminderJson;
+  const hostReminderJson = snapshots.hostReminderJson;
   const confirmedAt =
     decision.status === "CONFIRMED" ? new Date() : null;
 
@@ -1017,7 +1046,7 @@ export async function createBooking(opts: {
         status: decision.status,
         pendingOn: decision.pendingOn,
         manageToken,
-        hostReminderJson: snapshots.hostReminderJson,
+        hostReminderJson,
         guestReminderJson,
         confirmedAt,
       },

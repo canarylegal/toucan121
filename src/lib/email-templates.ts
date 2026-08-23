@@ -1,8 +1,33 @@
 import { APP_NAME } from "@/lib/brand";
 import { formatSlotLabel } from "@/lib/availability";
 import { formatTimezoneDisplay } from "@/lib/timezones";
+import { appBaseUrl } from "@/lib/email-tokens";
 
 export type EmailCta = { label: string; url: string };
+
+function privacyPolicyUrl(): string {
+  return `${appBaseUrl()}/privacy`;
+}
+
+function emailLegalFooterText(opts?: { unsubscribe?: EmailCta }): string {
+  const lines = [`Privacy policy: ${privacyPolicyUrl()}`];
+  if (opts?.unsubscribe) {
+    lines.push(`${opts.unsubscribe.label}: ${opts.unsubscribe.url}`);
+  }
+  lines.push(`— ${APP_NAME}`);
+  return lines.join("\n");
+}
+
+function emailLegalFooterHtml(opts?: { unsubscribe?: EmailCta }): string {
+  const privacy = privacyPolicyUrl();
+  return `Sent by ${escapeHtml(APP_NAME)}
+        <div style="margin-top:8px;"><a href="${escapeHtml(privacy)}" style="color:#5c6b63;text-decoration:underline;">Privacy policy</a></div>
+        ${
+          opts?.unsubscribe
+            ? `<div style="margin-top:8px;"><a href="${escapeHtml(opts.unsubscribe.url)}" style="color:#5c6b63;text-decoration:underline;">${escapeHtml(opts.unsubscribe.label)}</a></div>`
+            : ""
+        }`;
+}
 
 export type BookingEmailPayload = {
   subject: string;
@@ -24,6 +49,8 @@ export type BookingEmailPayload = {
   secondaryCta?: EmailCta;
   footerNote?: string;
   hasCalendarInvite?: boolean;
+  /** Reminder mail only — stop reminders for this meeting. */
+  unsubscribe?: EmailCta;
 };
 
 export type RenderedEmail = {
@@ -93,7 +120,7 @@ function renderText(payload: BookingEmailPayload): string {
   if (payload.footerNote) {
     lines.push("", payload.footerNote);
   }
-  lines.push("", `— ${APP_NAME}`);
+  lines.push("", emailLegalFooterText({ unsubscribe: payload.unsubscribe }));
   return lines.filter((l, i, arr) => !(l === "" && arr[i - 1] === "")).join("\n");
 }
 
@@ -169,7 +196,7 @@ ${preheader}
         }
       </td></tr>
       <tr><td style="padding:14px 24px;background:#f7faf8;color:#5c6b63;font-size:12px;">
-        Sent by ${escapeHtml(APP_NAME)}
+        ${emailLegalFooterHtml({ unsubscribe: payload.unsubscribe })}
       </td></tr>
     </table>
   </td></tr>
@@ -207,7 +234,7 @@ export function renderNoticeEmail(payload: NoticeEmailPayload): RenderedEmail {
   if (payload.footerNote) {
     lines.push("", payload.footerNote);
   }
-  lines.push("", `Sent by ${APP_NAME}`);
+  lines.push("", emailLegalFooterText());
 
   const ctaHtml = payload.primaryCta
     ? `<div style="margin:4px 0 8px;">${ctaButton(payload.primaryCta, true)}</div>`
@@ -239,7 +266,7 @@ export function renderNoticeEmail(payload: NoticeEmailPayload): RenderedEmail {
         }
       </td></tr>
       <tr><td style="padding:14px 24px;background:#f7faf8;color:#5c6b63;font-size:12px;">
-        Sent by ${escapeHtml(APP_NAME)}
+        ${emailLegalFooterHtml()}
       </td></tr>
     </table>
   </td></tr>

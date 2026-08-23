@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
-import { requireHostOrRedirect } from "@/lib/current-user";
+import { requireBookingHostOrRedirect } from "@/lib/current-user";
 import { HostBookingForm } from "@/components/host-booking-form";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +11,7 @@ export default async function HostNewBookingPage({
 }: {
   searchParams: Promise<{ meetingTypeId?: string }>;
 }) {
-  const sessionHost = await requireHostOrRedirect();
+  const sessionHost = await requireBookingHostOrRedirect();
   const { meetingTypeId } = await searchParams;
 
   const host = await prisma.host.findUnique({
@@ -55,7 +55,9 @@ export default async function HostNewBookingPage({
       </Link>
       <h1 className="mt-4 font-serif text-4xl tracking-tight">New booking</h1>
       <p className="mt-2 text-muted">
-        Pick a time and send a calendar invite to someone by email.
+        Pick a time and send a calendar invite to someone by email. You can
+        book outside your usual hours; existing bookings still block that
+        time.
       </p>
 
       <div className="mt-8 rounded-lg border border-line bg-panel p-5">

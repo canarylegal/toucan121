@@ -1,6 +1,7 @@
 /** Path segments that cannot be claimed as a public profile slug. */
 export const RESERVED_SLUGS = new Set([
   "about",
+  "privacy",
   "api",
   "book",
   "confirmed",
@@ -9,6 +10,10 @@ export const RESERVED_SLUGS = new Set([
   "dashboard",
   "host",
   "invite",
+  "forgot",
+  "reset",
+  "verify",
+  "reminders",
   "login",
   "logout",
   "signup",

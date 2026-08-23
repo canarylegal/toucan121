@@ -60,8 +60,8 @@ export function AvailabilityEditor({
       <div>
         <p className="text-sm font-medium">Weekly availability</p>
         <p className="text-xs text-muted">
-          Times are in your host timezone. Guests only see open slots inside
-          these windows.
+          Times are in your host timezone. Guests see start times every
+          15 minutes inside these windows.
         </p>
       </div>
       <input type="hidden" name="availabilityJson" value={json} />
@@ -91,6 +91,7 @@ export function AvailabilityEditor({
               <div className="col-span-1 flex flex-wrap items-center gap-2 sm:col-span-3">
                 <input
                   type="time"
+                  step={900}
                   value={row.start}
                   disabled={!row.enabled}
                   onChange={(e) => {
@@ -106,6 +107,7 @@ export function AvailabilityEditor({
                 <span className="text-sm text-muted">to</span>
                 <input
                   type="time"
+                  step={900}
                   value={row.end}
                   disabled={!row.enabled}
                   onChange={(e) => {

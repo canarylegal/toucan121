@@ -3,11 +3,18 @@ import { sendEmail } from "@/lib/email";
 import { renderBookingEmail } from "@/lib/email-templates";
 import { APP_NAME } from "@/lib/brand";
 import {
+  DISABLED_REMINDER_PREFS,
   parseReminderPrefs,
   planReminders,
   stringifyReminderPrefs,
   type ReminderPrefs,
 } from "@/lib/reminders";
+import {
+  createReminderStopToken,
+  isReminderSuppressed,
+  reminderStopPageUrl,
+  reminderUnsubscribeApiUrl,
+} from "@/lib/reminder-unsubscribe";
 import type { Booking, Host, MeetingType } from "@/generated/prisma/client";
 
 export async function cancelPendingReminders(bookingId: string) {
@@ -33,11 +40,15 @@ export async function rebuildRemindersForBooking(opts: {
 
   const hostPrefs = parseReminderPrefs(booking.hostReminderJson);
   const guestPrefs = parseReminderPrefs(booking.guestReminderJson);
+  const [hostSuppressed, guestSuppressed] = await Promise.all([
+    isReminderSuppressed(booking.host.email, "HOST"),
+    isReminderSuppressed(booking.guestEmail, "GUEST"),
+  ]);
   const planned = planReminders({
     confirmedAt: opts.confirmedAt ?? booking.updatedAt,
     startsAt: booking.startsAt,
-    hostPrefs,
-    guestPrefs,
+    hostPrefs: hostSuppressed ? DISABLED_REMINDER_PREFS : hostPrefs,
+    guestPrefs: guestSuppressed ? DISABLED_REMINDER_PREFS : guestPrefs,
   });
 
   if (planned.length === 0) return;
@@ -96,6 +107,16 @@ export async function processDueReminders(opts?: { limit?: number }) {
       continue;
     }
 
+    const email =
+      row.recipient === "GUEST" ? booking.guestEmail : booking.host.email;
+    if (await isReminderSuppressed(email, row.recipient)) {
+      await prisma.bookingReminder.update({
+        where: { id: row.id },
+        data: { cancelledAt: now },
+      });
+      continue;
+    }
+
     const location =
       booking.jitsiUrl ??
       (booking.venue || booking.meetingType.locationNote || "In person");
@@ -110,6 +131,17 @@ export async function processDueReminders(opts?: { limit?: number }) {
         ? `Upcoming: ${booking.meetingType.title} with ${booking.guestName}.`
         : `Reminder: ${booking.meetingType.title} with ${booking.guestName} is coming up.`;
     const dashUrl = `${(process.env.APP_URL || "http://localhost:3000").replace(/\/$/, "")}/dash`;
+    const stopToken = createReminderStopToken({
+      bookingId: booking.id,
+      recipient: row.recipient,
+      startsAt: booking.startsAt,
+    });
+    const stopUrl = reminderStopPageUrl(stopToken);
+    const listUnsubscribeUrl = reminderUnsubscribeApiUrl(stopToken);
+    const unsubscribe = {
+      label: "Stop reminders for this meeting",
+      url: stopUrl,
+    };
 
     try {
       if (row.recipient === "GUEST") {
@@ -128,6 +160,7 @@ export async function processDueReminders(opts?: { limit?: number }) {
           primaryCta: booking.jitsiUrl
             ? { label: "Open video room", url: booking.jitsiUrl }
             : undefined,
+          unsubscribe,
         });
         await sendEmail({
           to: booking.guestEmail,
@@ -136,6 +169,7 @@ export async function processDueReminders(opts?: { limit?: number }) {
           subject: mail.subject,
           text: mail.text,
           html: mail.html,
+          listUnsubscribeUrl,
         });
       } else {
         const mail = renderBookingEmail({
@@ -151,6 +185,7 @@ export async function processDueReminders(opts?: { limit?: number }) {
           location,
           videoUrl: booking.jitsiUrl,
           primaryCta: { label: "Open dashboard", url: dashUrl },
+          unsubscribe,
         });
         await sendEmail({
           to: booking.host.email,
@@ -158,6 +193,7 @@ export async function processDueReminders(opts?: { limit?: number }) {
           subject: mail.subject,
           text: mail.text,
           html: mail.html,
+          listUnsubscribeUrl,
         });
       }
 

@@ -1,24 +1,43 @@
+import type { ReactNode } from "react";
+import Link from "next/link";
 import {
   acceptConnectionAction,
   removeConnectionAction,
   requestConnectionByUserIdAction,
 } from "@/lib/connection-actions";
 
+type ConnectionState =
+  | { kind: "none" }
+  | { kind: "outgoing"; connectionId: string }
+  | { kind: "incoming"; connectionId: string }
+  | { kind: "accepted"; connectionId: string };
+
 export function ProfileConnectionControls({
   hostName,
   hostSlug,
   targetUserId,
   state,
+  emailVerified,
+  variant = "default",
 }: {
   hostName: string;
   hostSlug: string;
   targetUserId: string;
-  state:
-    | { kind: "none" }
-    | { kind: "outgoing"; connectionId: string }
-    | { kind: "incoming"; connectionId: string }
-    | { kind: "accepted"; connectionId: string };
+  emailVerified: boolean;
+  state: ConnectionState;
+  /** Compact top-bar placement on tree layout profiles. */
+  variant?: "default" | "header";
 }) {
+  const isHeader = variant === "header";
+  const surfaceClass = isHeader ? "profile-booking-surface" : "";
+  const rowClass = isHeader
+    ? "flex flex-wrap items-center justify-end gap-2 text-sm"
+    : "mt-6 flex flex-wrap items-center gap-3 text-sm";
+  const addLabel = isHeader ? "Add connection" : "Add as connection";
+  const addButtonClass = isHeader
+    ? "rounded-md border border-line bg-panel px-3 py-1.5 text-sm font-semibold text-foreground hover:bg-accent-soft"
+    : "rounded-md border border-line bg-panel px-4 py-2 text-sm font-semibold text-foreground hover:bg-accent-soft";
+
   const extras = (
     <>
       <input type="hidden" name="targetUserId" value={targetUserId} />
@@ -29,10 +48,17 @@ export function ProfileConnectionControls({
     </>
   );
 
+  function wrap(content: ReactNode) {
+    if (!surfaceClass) return content;
+    return <div className={surfaceClass}>{content}</div>;
+  }
+
   if (state.kind === "accepted") {
-    return (
-      <div className="mt-6 flex flex-wrap items-center gap-3 text-sm">
-        <p className="text-muted">Connected with {hostName}.</p>
+    return wrap(
+      <div className={rowClass}>
+        <p className="text-muted">
+          {isHeader ? "Connected" : `Connected with ${hostName}.`}
+        </p>
         <form action={removeConnectionAction}>
           {extras}
           <button
@@ -42,14 +68,16 @@ export function ProfileConnectionControls({
             Remove
           </button>
         </form>
-      </div>
+      </div>,
     );
   }
 
   if (state.kind === "outgoing") {
-    return (
-      <div className="mt-6 flex flex-wrap items-center gap-3 text-sm">
-        <p className="text-muted">Connection request sent to {hostName}.</p>
+    return wrap(
+      <div className={rowClass}>
+        <p className="text-muted">
+          {isHeader ? "Request sent" : `Connection request sent to ${hostName}.`}
+        </p>
         <form action={removeConnectionAction}>
           {extras}
           <button
@@ -59,14 +87,16 @@ export function ProfileConnectionControls({
             Cancel
           </button>
         </form>
-      </div>
+      </div>,
     );
   }
 
   if (state.kind === "incoming") {
-    return (
-      <div className="mt-6 flex flex-wrap items-center gap-3 text-sm">
-        <p className="text-muted">{hostName} asked to connect.</p>
+    return wrap(
+      <div className={rowClass}>
+        <p className="text-muted">
+          {isHeader ? `${hostName} wants to connect` : `${hostName} asked to connect.`}
+        </p>
         <form action={acceptConnectionAction}>
           {extras}
           <button
@@ -85,19 +115,25 @@ export function ProfileConnectionControls({
             Ignore
           </button>
         </form>
-      </div>
+      </div>,
+    );
+  }
+
+  if (emailVerified) {
+    return wrap(
+      <form action={requestConnectionByUserIdAction} className={isHeader ? "" : "mt-6"}>
+        {extras}
+        <button type="submit" className={addButtonClass}>{addLabel}</button>
+      </form>,
     );
   }
 
   return (
-    <form action={requestConnectionByUserIdAction} className="mt-6">
-      {extras}
-      <button
-        type="submit"
-        className="rounded-md border border-line bg-panel px-4 py-2 text-sm font-semibold hover:bg-accent-soft"
-      >
-        Add as connection
-      </button>
-    </form>
+    <p className={isHeader ? "text-sm text-muted" : "mt-6 text-sm text-muted"}>
+      <Link href="/dash/account" className="font-medium text-accent underline">
+        Confirm your email
+      </Link>
+      {isHeader ? null : " to add a connection."}
+    </p>
   );
 }

@@ -18,9 +18,12 @@ export type OutboundEmail = {
   fromName?: string;
   replyTo?: string;
   icsContent?: string;
+  /** RFC 8058 one-click unsubscribe (reminder mail only). */
+  listUnsubscribeUrl?: string;
 };
 
 let transporter: Transporter | null | undefined;
+let authTransporter: Transporter | null | undefined;
 
 function smtpConfigured(): boolean {
   return Boolean(
@@ -51,6 +54,7 @@ function getTransporter(): Transporter | null {
     host,
     port,
     secure,
+    requireTLS: !secure && port === 587,
     auth:
       process.env.SMTP_USER && process.env.SMTP_PASS
         ? {
@@ -100,13 +104,19 @@ export async function sendEmail(message: OutboundEmail): Promise<void> {
   }
 
   try {
-    await transport.sendMail({
+    const info = await transport.sendMail({
       from,
       to: message.to,
       replyTo: message.replyTo,
       subject: message.subject,
       text: message.text,
       html: message.html,
+      headers: message.listUnsubscribeUrl
+        ? {
+            "List-Unsubscribe": `<${message.listUnsubscribeUrl}>`,
+            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+          }
+        : undefined,
       attachments: message.icsContent
         ? [
             {
@@ -117,13 +127,112 @@ export async function sendEmail(message: OutboundEmail): Promise<void> {
           ]
         : undefined,
     });
+    console.info("[toucan:email] sent", {
+      to: message.to,
+      subject: message.subject,
+      messageId: info.messageId,
+      response: info.response,
+    });
   } catch (err) {
     console.error("[toucan:email] SMTP send failed; falling back to console", err);
     logFallback(message, from);
   }
 }
 
+function envOr(primary: string | undefined, fallback: string | undefined) {
+  const a = primary?.trim();
+  if (a) return a;
+  return fallback?.trim() || "";
+}
+
+function buildAuthFrom(): string {
+  return (
+    process.env.AUTH_SMTP_FROM?.trim() ||
+    process.env.SMTP_FROM?.trim() ||
+    `${APP_NAME} <no-reply@localhost>`
+  );
+}
+
+function getAuthTransporter(): Transporter | null {
+  if (authTransporter !== undefined) return authTransporter;
+  if (
+    !smtpConfigured() &&
+    !process.env.AUTH_SMTP_HOST?.trim() &&
+    !process.env.AUTH_SMTP_URL?.trim()
+  ) {
+    authTransporter = null;
+    return null;
+  }
+
+  if (process.env.AUTH_SMTP_URL?.trim()) {
+    authTransporter = nodemailer.createTransport(
+      process.env.AUTH_SMTP_URL.trim(),
+    );
+    return authTransporter;
+  }
+
+  const host = envOr(process.env.AUTH_SMTP_HOST, process.env.SMTP_HOST);
+  if (!host) {
+    authTransporter = null;
+    return null;
+  }
+  const port = Number(
+    envOr(process.env.AUTH_SMTP_PORT, process.env.SMTP_PORT) || "587",
+  );
+  const secure =
+    process.env.AUTH_SMTP_SECURE === "true" ||
+    process.env.AUTH_SMTP_SECURE === "1" ||
+    process.env.SMTP_SECURE === "true" ||
+    process.env.SMTP_SECURE === "1" ||
+    port === 465;
+  const user = envOr(process.env.AUTH_SMTP_USER, process.env.SMTP_USER);
+  const pass = envOr(process.env.AUTH_SMTP_PASS, process.env.SMTP_PASS);
+
+  authTransporter = nodemailer.createTransport({
+    host,
+    port,
+    secure,
+    requireTLS: !secure && port === 587,
+    auth: user && pass ? { user, pass } : undefined,
+  });
+  return authTransporter;
+}
+
+/** Account mail: password reset, email confirm. Uses AUTH_SMTP_* or the booking SMTP. */
+export async function sendAuthEmail(
+  message: Omit<OutboundEmail, "icsContent" | "fromName">,
+): Promise<void> {
+  const from = buildAuthFrom();
+  const transport = getAuthTransporter();
+
+  if (!transport) {
+    logFallback(message, from);
+    return;
+  }
+
+  try {
+    const info = await transport.sendMail({
+      from,
+      to: message.to,
+      replyTo: message.replyTo,
+      subject: message.subject,
+      text: message.text,
+      html: message.html,
+    });
+    console.info("[toucan:email] AUTH SMTP sent", {
+      to: message.to,
+      subject: message.subject,
+      id: info.messageId,
+      response: info.response,
+    });
+  } catch (err) {
+    console.error("[toucan:email] AUTH SMTP send failed", err);
+    throw err;
+  }
+}
+
 /** Reset cached transporter (tests / env changes). */
 export function resetEmailTransport(): void {
   transporter = undefined;
+  authTransporter = undefined;
 }

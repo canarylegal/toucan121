@@ -7,7 +7,22 @@ export type SessionUser = {
   id: string;
   email: string;
   name: string;
+  emailVerified: boolean;
 };
+
+function toSession(user: {
+  id: string;
+  email: string;
+  name: string;
+  emailVerifiedAt: Date | null;
+}): SessionUser {
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    emailVerified: user.emailVerifiedAt != null,
+  };
+}
 
 /** Authenticated account (hosting optional). */
 export async function requireUser(): Promise<SessionUser> {
@@ -18,7 +33,7 @@ export async function requireUser(): Promise<SessionUser> {
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user) throw new Error("Unauthorized");
 
-  return { id: user.id, email: user.email, name: user.name };
+  return toSession(user);
 }
 
 export async function requireUserOrRedirect(
@@ -31,7 +46,7 @@ export async function requireUserOrRedirect(
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user) redirect(`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`);
 
-  return { id: user.id, email: user.email, name: user.name };
+  return toSession(user);
 }
 
 export async function getOptionalUser(): Promise<SessionUser | null> {
@@ -40,10 +55,10 @@ export async function getOptionalUser(): Promise<SessionUser | null> {
   if (!id) return null;
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user) return null;
-  return { id: user.id, email: user.email, name: user.name };
+  return toSession(user);
 }
 
-/** Host profile for the signed-in user, or null if they are not hosting yet. */
+/** Host profile for the signed-in user, or null if they have not set up hosting. */
 export async function getOptionalHost(): Promise<
   (Host & { user: User }) | null
 > {
@@ -56,16 +71,40 @@ export async function getOptionalHost(): Promise<
   });
 }
 
+export function isHostingLive(host: Host | null | undefined): boolean {
+  return Boolean(host?.hostingActive);
+}
+
+export function isBookingEnabled(host: Host | null | undefined): boolean {
+  return Boolean(host?.hostingActive && host?.bookingEnabled);
+}
+
 export async function requireHost(): Promise<Host & { user: User }> {
   const host = await getOptionalHost();
   if (!host) throw new Error("Unauthorized");
   return host;
 }
 
-/** Hosting routes: login, then opt-in to hosting if needed. */
+export async function requireActiveHost(): Promise<Host & { user: User }> {
+  const host = await requireHost();
+  if (!host.hostingActive) throw new Error("Hosting is paused");
+  return host;
+}
+
+/** Profile routes: any live public profile (links-only or full hosting). */
 export async function requireHostOrRedirect(): Promise<Host & { user: User }> {
   await requireUserOrRedirect();
   const host = await getOptionalHost();
-  if (!host) redirect("/dash/hosting/setup");
+  if (!host) redirect("/dash/links/setup");
+  if (!host.hostingActive) redirect("/dash");
+  return host;
+}
+
+/** Booking, calendar, and meeting-type routes. */
+export async function requireBookingHostOrRedirect(): Promise<
+  Host & { user: User }
+> {
+  const host = await requireHostOrRedirect();
+  if (!host.bookingEnabled) redirect("/dash?bookingRequired=1");
   return host;
 }

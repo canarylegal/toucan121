@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireHostOrRedirect } from "@/lib/current-user";
+import { requireBookingHostOrRedirect } from "@/lib/current-user";
 import { DEFAULT_WEEKDAY_WINDOWS } from "@/lib/availability";
 import { DEFAULT_REMINDER_PREFS } from "@/lib/reminders";
 import { MeetingTypeForm } from "@/components/meeting-type-form";
@@ -7,7 +7,7 @@ import { MeetingTypeForm } from "@/components/meeting-type-form";
 export const dynamic = "force-dynamic";
 
 export default async function NewMeetingTypePage() {
-  const host = await requireHostOrRedirect();
+  const host = await requireBookingHostOrRedirect();
 
   return (
     <main className="mx-auto w-full max-w-xl px-6 py-12">

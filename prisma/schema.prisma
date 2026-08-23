@@ -72,19 +72,54 @@ enum ScheduleViewMode {
   LIST
 }
 
-model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String
-  name         String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+enum ProfileLayoutMode {
+  BOOK_FIRST
+  LINKS_FIRST
+}
 
-  host Host?
+enum HostingPreference {
+  VISITOR
+  LINKS
+  HOST
+}
+
+enum EmailTokenPurpose {
+  PASSWORD_RESET
+  EMAIL_VERIFY
+}
+
+model User {
+  id              String    @id @default(cuid())
+  email           String    @unique
+  passwordHash    String
+  name            String
+  /// Set when the account email was confirmed via a mailed link.
+  emailVerifiedAt DateTime?
+  /// Set at onboarding: visitor-only or wants to host.
+  hostingPreference HostingPreference?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  host        Host?
+  emailTokens EmailToken[]
 
   connectionsLow         UserConnection[] @relation("ConnectionLow")
   connectionsHigh        UserConnection[] @relation("ConnectionHigh")
   connectionRequestsMade UserConnection[] @relation("ConnectionRequester")
+}
+
+model EmailToken {
+  id        String            @id @default(cuid())
+  userId    String
+  purpose   EmailTokenPurpose
+  tokenHash String            @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime          @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose])
 }
 
 model Host {
@@ -110,7 +145,17 @@ model Host {
   youtubeUrl   String   @default("")
   /// JSON array of SocialLinkKey for public icon order
   socialOrderJson String @default("[]")
+  /// Public profile layout: booking-led or link-stack (Linktree-style)
+  profileLayoutMode ProfileLayoutMode @default(BOOK_FIRST)
+  /// JSON array of stack entries (custom links, socials, book) for ordering
+  profileStackOrderJson String @default("[]")
+  /// Links-first theme: colour, background preset, button style
+  profileThemeJson String @default("{}")
   slug         String   @unique
+  /// When false, public profile is hidden and hosting tools are paused.
+  hostingActive Boolean @default(true)
+  /// When false, profile is public but booking / meeting types are disabled.
+  bookingEnabled Boolean @default(true)
   timezone     String   @default("Europe/London")
   /// How many days ahead guests can book
   bookingHorizonDays Int @default(60)
@@ -123,6 +168,26 @@ model Host {
   calendars    CalendarConnection[]
   bookings     Booking[]
   timeBlocks   HostTimeBlock[]
+  links        HostLink[]
+}
+
+/// Custom outbound link on a host profile (links-first / book-first list).
+model HostLink {
+  id        String   @id @default(cuid())
+  hostId    String
+  title     String
+  url       String
+  /// Curated Toucan icon when emoji is empty (link, shop, video, …)
+  iconKey   String   @default("link")
+  /// Optional emoji override for the stack button
+  emoji     String   @default("")
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  host Host @relation(fields: [hostId], references: [id], onDelete: Cascade)
+
+  @@index([hostId])
 }
 
 /// Undirected account pair (userLowId < userHighId). PENDING = request; ACCEPTED = connected.
@@ -273,4 +338,15 @@ model BookingReminder {
 
   @@index([scheduledFor, sentAt, cancelledAt])
   @@index([bookingId])
+}
+
+/// Opt-out of reminder mail (not confirm/cancel/reschedule). Guest or host role.
+model ReminderSuppression {
+  id         String             @id @default(cuid())
+  email      String
+  recipient  ReminderRecipient
+  createdAt  DateTime           @default(now())
+
+  @@unique([email, recipient])
+  @@index([email])
 }

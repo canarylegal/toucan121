@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { APP_NAME } from "@/lib/brand";
+import { APP_NAME, GITHUB_REPO_URL } from "@/lib/brand";
 import { ToucanBrand } from "@/components/toucan-brand";
 
 export const metadata: Metadata = {
@@ -85,6 +85,23 @@ export default function AboutPage() {
         ))}
       </dl>
 
+      <section className="mt-8 rounded-lg border border-line bg-panel p-5">
+        <h2 className="font-serif text-2xl tracking-tight">Open source</h2>
+        <p className="mt-3 text-sm leading-relaxed text-muted">
+          {APP_NAME} is free open-source software. You can browse the code,
+          report issues, suggest improvements, or run your own instance from
+          the repository on GitHub.
+        </p>
+        <a
+          href={GITHUB_REPO_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-4 inline-block text-sm font-semibold text-accent underline"
+        >
+          View on GitHub
+        </a>
+      </section>
+
       <div className="mt-8 flex flex-wrap gap-3">
         <Link
           href="/signup"
@@ -97,6 +114,12 @@ export default function AboutPage() {
           className="rounded-md border border-line bg-panel px-5 py-3 text-sm font-semibold hover:bg-accent-soft"
         >
           Sign in
+        </Link>
+        <Link
+          href="/privacy"
+          className="rounded-md border border-line bg-panel px-5 py-3 text-sm font-semibold hover:bg-accent-soft"
+        >
+          Privacy
         </Link>
       </div>
     </main>

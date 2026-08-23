@@ -79,7 +79,11 @@ export async function signupAction(
     };
   }
 
-  redirect(safeCallbackPath(formData.get("callbackUrl")));
+  const callback = safeCallbackPath(formData.get("callbackUrl"));
+  if (!callback || callback === "/dash") {
+    redirect("/dash/welcome");
+  }
+  redirect(callback);
 }
 
 export async function loginAction(

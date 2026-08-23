@@ -61,7 +61,8 @@ export function CalDavConnectForm({ connected, embedded = false }: Props) {
                 {connected.username} · {connected.serverUrl}
               </p>
               <p className="mt-2 text-xs text-muted">
-                Bookings are written here and existing events block availability.
+                Upcoming bookings are written here and existing events block
+                availability.
               </p>
             </div>
             <details className="text-sm">

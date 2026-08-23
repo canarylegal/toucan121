@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { requireHostOrRedirect } from "@/lib/current-user";
+import { requireBookingHostOrRedirect } from "@/lib/current-user";
 import { HostBookingList } from "@/components/host-booking-list";
 
 export const dynamic = "force-dynamic";
 
 export default async function HostMeetingHistoryPage() {
-  const host = await requireHostOrRedirect();
+  const host = await requireBookingHostOrRedirect();
   const now = new Date();
 
   const meetings = await prisma.booking.findMany({

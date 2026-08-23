@@ -6,11 +6,14 @@ import type { ProfileFormValues } from "@/lib/profile";
 import { parseSocialOrder } from "@/lib/social-order";
 import { requireHost } from "@/lib/current-user";
 import { ZodError } from "zod";
+import type { ProfileLayoutMode } from "@/generated/prisma/client";
 
 export type ProfileFormState = {
   error?: string;
   success?: string;
-  values?: Omit<ProfileFormValues, "avatarPath">;
+  values?: Omit<ProfileFormValues, "avatarPath"> & {
+    avatarPath?: string | null;
+  };
   formKey?: number;
 };
 
@@ -30,6 +33,14 @@ function readValues(formData: FormData): Omit<ProfileFormValues, "avatarPath"> {
     xUrl: String(formData.get("xUrl") ?? ""),
     youtubeUrl: String(formData.get("youtubeUrl") ?? ""),
     socialOrder: parseSocialOrder(String(formData.get("socialOrderJson") ?? "[]")),
+    profileLayoutMode:
+      String(formData.get("profileLayoutMode") ?? "BOOK_FIRST") === "LINKS_FIRST"
+        ? "LINKS_FIRST"
+        : "BOOK_FIRST",
+    profileStackOrderJson: String(
+      formData.get("profileStackOrderJson") ?? "[]",
+    ),
+    profileThemeJson: String(formData.get("profileThemeJson") ?? "{}"),
     timezone: String(formData.get("timezone") ?? "Europe/London"),
     bookingHorizonDays: Number(formData.get("bookingHorizonDays") ?? 60),
   };
@@ -50,6 +61,8 @@ export async function updateProfileAction(
     const parsed = profileSchema.parse({
       ...values,
       socialOrderJson: JSON.stringify(values.socialOrder),
+      profileStackOrderJson: values.profileStackOrderJson,
+      profileThemeJson: values.profileThemeJson,
       removeAvatar,
     });
     const host = await updateHostProfile({
@@ -80,8 +93,12 @@ export async function updateProfileAction(
         xUrl: host.xUrl,
         youtubeUrl: host.youtubeUrl,
         socialOrder: parseSocialOrder(host.socialOrderJson),
+        profileLayoutMode: host.profileLayoutMode as ProfileLayoutMode,
+        profileStackOrderJson: host.profileStackOrderJson,
+        profileThemeJson: host.profileThemeJson,
         timezone: host.timezone,
         bookingHorizonDays: host.bookingHorizonDays,
+        avatarPath: host.avatarPath,
       },
       formKey,
     };

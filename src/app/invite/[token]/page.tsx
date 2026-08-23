@@ -161,6 +161,14 @@ export default async function InvitePage({
                 value={guestReminder}
               />
             </div>
+            <p className="text-xs leading-relaxed text-muted">
+              By accepting, you agree we may email you about this booking
+              (confirmation, changes, and cancellations). See our{" "}
+              <a href="/privacy" className="font-medium text-accent underline">
+                privacy policy
+              </a>
+              .
+            </p>
             <button
               type="submit"
               className="rounded-md bg-accent px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90"

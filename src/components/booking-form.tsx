@@ -198,6 +198,16 @@ export function BookingForm({
 
       {error ? <p className="text-sm text-red-700">{error}</p> : null}
 
+      <p className="text-xs leading-relaxed text-muted">
+        By confirming, you agree we may email you about this booking
+        (confirmation, changes, and cancellations). Optional reminders can be
+        changed above. See our{" "}
+        <a href="/privacy" className="font-medium text-accent underline">
+          privacy policy
+        </a>
+        .
+      </p>
+
       <button
         type="submit"
         disabled={pending || !startsAt}

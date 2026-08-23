@@ -31,12 +31,14 @@ export function ProfileBookingPanel({
   timezone,
   meetingTypes,
   overviewCandidates = [],
+  variant = "default",
 }: {
   hostSlug: string;
   timezone: string;
   meetingTypes: ProfileMeetingType[];
   /** Union of available days across meeting types (no preselected type). */
   overviewCandidates?: BookingSlotCandidate[];
+  variant?: "default" | "stack";
 }) {
   const router = useRouter();
   const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
@@ -97,13 +99,23 @@ export function ProfileBookingPanel({
     );
   }
 
-  return (
-    <div>
-      <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted">
-        Book a meeting
-      </h2>
+  const stackLayout = variant === "stack";
 
-      <div className="mt-4 grid items-start gap-8 lg:grid-cols-[minmax(0,16rem)_minmax(0,1fr)]">
+  return (
+    <div className={stackLayout ? "profile-booking-surface" : undefined}>
+      {!stackLayout ? (
+        <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted">
+          Book a meeting
+        </h2>
+      ) : null}
+
+      <div
+        className={
+          stackLayout
+            ? "space-y-6"
+            : "mt-4 grid items-start gap-8 lg:grid-cols-[minmax(0,16rem)_minmax(0,1fr)]"
+        }
+      >
         <ul className="space-y-2">
           {meetingTypes.map((mt) => {
             const active = mt.slug === selectedSlug;
@@ -136,7 +148,13 @@ export function ProfileBookingPanel({
           })}
         </ul>
 
-        <div className="rounded-lg border border-line bg-panel p-5">
+        <div
+          className={
+            stackLayout
+              ? "rounded-lg border border-line bg-panel p-4"
+              : "rounded-lg border border-line bg-panel p-5"
+          }
+        >
           <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
             <h3 className="font-semibold">
               {selected ? selected.title : "Availability"}
@@ -145,26 +163,32 @@ export function ProfileBookingPanel({
           </div>
 
           {!selectedSlug ? (
-            <>
-              <p className="mb-4 text-sm text-muted">
-                Choose a meeting type to pick a time.
+            stackLayout ? (
+              <p className="text-sm text-muted">
+                Choose a meeting type above to pick a time.
               </p>
-              <div
-                className="pointer-events-none select-none opacity-40"
-                aria-hidden
-              >
-                <SlotCalendarPicker
-                  key="overview"
-                  timezone={tzLabel}
-                  candidates={overviewCandidates}
-                  value=""
-                  onChange={() => {}}
-                  showTimeSlots={false}
-                  interactive={false}
-                  emptyMessage="No open days in the next four weeks."
-                />
-              </div>
-            </>
+            ) : (
+              <>
+                <p className="mb-4 text-sm text-muted">
+                  Choose a meeting type to pick a time.
+                </p>
+                <div
+                  className="pointer-events-none select-none opacity-40"
+                  aria-hidden
+                >
+                  <SlotCalendarPicker
+                    key="overview"
+                    timezone={tzLabel}
+                    candidates={overviewCandidates}
+                    value=""
+                    onChange={() => {}}
+                    showTimeSlots={false}
+                    interactive={false}
+                    emptyMessage="No open days in the next four weeks."
+                  />
+                </div>
+              </>
+            )
           ) : loading ? (
             <p className="text-sm text-muted">Loading availability…</p>
           ) : error ? (

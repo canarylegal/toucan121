@@ -15,6 +15,8 @@ export type HostBookingFormState = {
     notes: string;
     startsAt: string;
     venue: string;
+    confirmMode: "ask" | "auto";
+    sendReminders: "1" | "0";
   };
   formKey?: number;
 };
@@ -26,6 +28,8 @@ const schema = z.object({
   guestEmail: z.string().trim().email(),
   notes: z.string().trim().max(2000).optional(),
   venue: z.string().trim().max(300).optional(),
+  confirmMode: z.enum(["ask", "auto"]),
+  sendReminders: z.enum(["1", "0"]),
 });
 
 export async function createHostBookingAction(
@@ -39,6 +43,14 @@ export async function createHostBookingAction(
     guestEmail: String(formData.get("guestEmail") ?? ""),
     notes: String(formData.get("notes") ?? ""),
     venue: String(formData.get("venue") ?? ""),
+    confirmMode:
+      String(formData.get("confirmMode") ?? "ask") === "auto"
+        ? ("auto" as const)
+        : ("ask" as const),
+    sendReminders:
+      String(formData.get("sendReminders") ?? "1") === "0"
+        ? ("0" as const)
+        : ("1" as const),
   };
   const formKey = (prev.formKey ?? 0) + 1;
 
@@ -50,6 +62,8 @@ export async function createHostBookingAction(
       hostId: host.id,
       initiatedBy: "host",
       allowInactiveMeetingType: true,
+      hostAutoConfirm: parsed.confirmMode === "auto",
+      sendReminders: parsed.sendReminders === "1",
       input: {
         meetingTypeId: parsed.meetingTypeId,
         startsAt: parsed.startsAt,
@@ -78,5 +92,7 @@ export async function createHostBookingAction(
     };
   }
 
-  redirect("/dash?booked=1");
+  const booked =
+    values.confirmMode === "auto" ? "confirmed" : "pending";
+  redirect(`/dash?booked=${booked}`);
 }
