@@ -16,6 +16,7 @@ const serif = Source_Serif_4({
 export const metadata: Metadata = {
   title: APP_NAME,
   description: "Appointment booking with calendar sync and video links",
+  manifest: "/manifest.webmanifest",
   icons: {
     icon: [
       { url: "/icon.png?v=20260813e", type: "image/png", sizes: "192x192" },

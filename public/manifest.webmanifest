@@ -1,0 +1,23 @@
+{
+  "name": "Toucan 121",
+  "short_name": "Toucan",
+  "description": "Appointment booking with calendar sync and video links",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1c644a",
+  "theme_color": "#1c644a",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
