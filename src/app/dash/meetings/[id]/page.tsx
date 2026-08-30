@@ -8,6 +8,8 @@ import { parseReminderPrefs } from "@/lib/reminders";
 import { MeetingTypeForm } from "@/components/meeting-type-form";
 import { DeleteMeetingTypeButton } from "@/components/delete-meeting-type-button";
 import { toggleMeetingTypeAction } from "@/lib/meeting-type-actions";
+import { CalendarConnectBanner } from "@/components/calendar-connect-banner";
+import { hostHasConnectedCalendarById } from "@/lib/calendar/host-calendar";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +23,7 @@ export default async function EditMeetingTypePage({
   const { id } = await params;
   const { error } = await searchParams;
   const host = await requireBookingHostOrRedirect();
+  const calendarConnected = await hostHasConnectedCalendarById(host.id);
 
   const meetingType = await prisma.meetingType.findFirst({
     where: { id, hostId: host.id, deletedAt: null },
@@ -68,6 +71,8 @@ export default async function EditMeetingTypePage({
           {error}
         </p>
       ) : null}
+
+      {!calendarConnected ? <CalendarConnectBanner /> : null}
 
       <div className="mt-4 flex flex-wrap items-center gap-4">
         <form action={toggleMeetingTypeAction}>

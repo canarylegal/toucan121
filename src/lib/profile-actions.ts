@@ -26,6 +26,7 @@ function readValues(formData: FormData): Omit<ProfileFormValues, "avatarPath"> {
     websiteUrl: String(formData.get("websiteUrl") ?? ""),
     publicEmail: String(formData.get("publicEmail") ?? ""),
     phone: String(formData.get("phone") ?? ""),
+    whatsappUrl: String(formData.get("whatsappUrl") ?? ""),
     linkedinUrl: String(formData.get("linkedinUrl") ?? ""),
     facebookUrl: String(formData.get("facebookUrl") ?? ""),
     instagramUrl: String(formData.get("instagramUrl") ?? ""),
@@ -43,6 +44,7 @@ function readValues(formData: FormData): Omit<ProfileFormValues, "avatarPath"> {
     profileThemeJson: String(formData.get("profileThemeJson") ?? "{}"),
     timezone: String(formData.get("timezone") ?? "Europe/London"),
     bookingHorizonDays: Number(formData.get("bookingHorizonDays") ?? 60),
+    contactRowEnabled: true,
   };
 }
 
@@ -63,6 +65,10 @@ export async function updateProfileAction(
       socialOrderJson: JSON.stringify(values.socialOrder),
       profileStackOrderJson: values.profileStackOrderJson,
       profileThemeJson: values.profileThemeJson,
+      contactRowEnabled:
+        values.profileLayoutMode === "LINKS_FIRST"
+          ? formData.get("contactRowEnabled") === "on"
+          : hostRecord.contactRowEnabled,
       removeAvatar,
     });
     const host = await updateHostProfile({
@@ -86,6 +92,7 @@ export async function updateProfileAction(
         websiteUrl: host.websiteUrl,
         publicEmail: host.publicEmail,
         phone: host.phone,
+        whatsappUrl: host.whatsappUrl,
         linkedinUrl: host.linkedinUrl,
         facebookUrl: host.facebookUrl,
         instagramUrl: host.instagramUrl,
@@ -94,6 +101,7 @@ export async function updateProfileAction(
         youtubeUrl: host.youtubeUrl,
         socialOrder: parseSocialOrder(host.socialOrderJson),
         profileLayoutMode: host.profileLayoutMode as ProfileLayoutMode,
+        contactRowEnabled: host.contactRowEnabled,
         profileStackOrderJson: host.profileStackOrderJson,
         profileThemeJson: host.profileThemeJson,
         timezone: host.timezone,

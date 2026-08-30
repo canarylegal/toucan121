@@ -11,6 +11,8 @@ import {
 import type { BookingSlotCandidate } from "@/components/slot-calendar-picker";
 import { HostBrandingHeader, type PublicHostBranding } from "@/components/host-branding";
 import { ProfileTreeAvatarGallery } from "@/components/profile-tree-avatar-gallery";
+import { ProfileContactRow } from "@/components/profile-contact-row";
+import type { ContactRowItem } from "@/lib/profile-contact-row";
 
 export function ProfileLinksFirstView({
   branding,
@@ -22,6 +24,7 @@ export function ProfileLinksFirstView({
   theme,
   bookingEnabled = true,
   profileUrl,
+  contactRowItems = [],
 }: {
   branding: PublicHostBranding;
   stackButtons: ResolvedStackButton[];
@@ -32,9 +35,13 @@ export function ProfileLinksFirstView({
   overviewCandidates: BookingSlotCandidate[];
   theme: ResolvedProfileTheme;
   bookingEnabled?: boolean;
+  contactRowItems?: ContactRowItem[];
 }) {
   const [bookingOpen, setBookingOpen] = useState(false);
   const showBooking = bookingEnabled && meetingTypes.length > 0;
+  const visibleButtons = showBooking
+    ? stackButtons
+    : stackButtons.filter((item) => item.kind !== "book");
 
   return (
     <div className="mx-auto w-full max-w-md">
@@ -55,6 +62,12 @@ export function ProfileLinksFirstView({
           }
         />
       </div>
+
+      {contactRowItems.length > 0 ? (
+        <div className="mt-6">
+          <ProfileContactRow items={contactRowItems} />
+        </div>
+      ) : null}
 
       <div className="mt-8">
         {bookingOpen && showBooking ? (
@@ -77,7 +90,7 @@ export function ProfileLinksFirstView({
           </div>
         ) : (
           <ProfileLinkButtonList
-            items={stackButtons}
+            items={visibleButtons}
             onBook={showBooking ? () => setBookingOpen(true) : undefined}
             theme={theme}
           />

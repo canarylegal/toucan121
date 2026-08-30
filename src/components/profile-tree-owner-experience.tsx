@@ -11,6 +11,7 @@ import type { ResolvedProfileTheme } from "@/lib/profile-theme";
 import type { ProfileMeetingType } from "@/components/profile-booking-panel";
 import type { BookingSlotCandidate } from "@/components/slot-calendar-picker";
 import type { PublicHostBranding } from "@/components/host-branding";
+import type { ContactRowItem } from "@/lib/profile-contact-row";
 
 const headerLinkClass = "underline";
 
@@ -27,6 +28,7 @@ export function ProfileTreeOwnerExperience({
   theme,
   bookingEnabled,
   profileUrl,
+  contactRowItems = [],
 }: {
   initial: ProfileFormValues;
   startEditing?: boolean;
@@ -40,6 +42,7 @@ export function ProfileTreeOwnerExperience({
   overviewCandidates: BookingSlotCandidate[];
   theme: ResolvedProfileTheme;
   bookingEnabled: boolean;
+  contactRowItems?: ContactRowItem[];
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -134,6 +137,7 @@ export function ProfileTreeOwnerExperience({
           overviewCandidates={overviewCandidates}
           theme={theme}
           bookingEnabled={bookingEnabled}
+          contactRowItems={contactRowItems}
         />
       )}
     </>

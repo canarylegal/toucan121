@@ -1,11 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { ProfileStackEntry } from "@/lib/profile-stack";
 import { stackEntryKey } from "@/lib/profile-stack";
 import type { SocialLinkKey } from "@/components/social-icons";
 import { SOCIAL_LINK_META } from "@/components/social-icons";
 import { HostLinkIconFields } from "@/components/host-link-icon-fields";
+import {
+  addHostLinkAction,
+  deleteHostLinkAction,
+  updateHostLinkAction,
+} from "@/lib/host-link-actions";
 
 type LinkRow = {
   id: string;
@@ -25,9 +30,11 @@ function labelForEntry(
   entry: ProfileStackEntry,
   links: LinkRow[],
   socialValues: Partial<Record<SocialLinkKey, string>>,
+  hideStackSocialKeys?: SocialLinkKey[],
 ): string | null {
   if (entry.type === "book") return "Book a meeting";
   if (entry.type === "social") {
+    if (hideStackSocialKeys?.includes(entry.key)) return null;
     if (!socialValues[entry.key]?.trim()) return null;
     return SOCIAL_LINK_META.find((m) => m.key === entry.key)?.label ?? entry.key;
   }
@@ -41,16 +48,23 @@ export function ProfileStackEditor({
   socialValues,
   linksFirst,
   onChange,
+  hideStackSocialKeys,
 }: {
   entries: ProfileStackEntry[];
   links: LinkRow[];
   socialValues: Partial<Record<SocialLinkKey, string>>;
   linksFirst: boolean;
   onChange: (next: ProfileStackEntry[]) => void;
+  hideStackSocialKeys?: SocialLinkKey[];
 }) {
   const rows: StackRow[] = entries
     .map((entry) => {
-      const label = labelForEntry(entry, links, socialValues);
+      const label = labelForEntry(
+        entry,
+        links,
+        socialValues,
+        hideStackSocialKeys,
+      );
       if (!label) return null;
       return { key: stackEntryKey(entry), label, entry };
     })
@@ -115,24 +129,70 @@ export function ProfileStackEditor({
   );
 }
 
+function collectFields(root: HTMLElement): FormData {
+  const fd = new FormData();
+  root.querySelectorAll("input, select, textarea").forEach((el) => {
+    if (!(el instanceof HTMLInputElement || el instanceof HTMLSelectElement)) {
+      return;
+    }
+    if (!el.name || el.type === "button" || el.type === "submit") return;
+    fd.append(el.name, el.value);
+  });
+  return fd;
+}
+
 export function ProfileLinksManager({
   links,
   onLinksChange,
+  onLinkAdded,
+  onLinkRemoved,
+  onLinkUpdated,
 }: {
   links: LinkRow[];
   onLinksChange?: () => void;
+  onLinkAdded?: (link: LinkRow) => void;
+  onLinkRemoved?: (linkId: string) => void;
+  onLinkUpdated?: (link: LinkRow) => void;
 }) {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [addFormKey, setAddFormKey] = useState(0);
+  const addFormRef = useRef<HTMLDivElement>(null);
 
-  async function submitAction(
-    action: (formData: FormData) => Promise<void>,
-    formData: FormData,
-  ) {
+  async function handleAddLink() {
+    const root = addFormRef.current;
+    if (!root) {
+      setError("Could not read link fields — try again");
+      return;
+    }
+
+    const title = (
+      root.querySelector<HTMLInputElement>('input[data-field="title"]')?.value ??
+      ""
+    ).trim();
+    const url = (
+      root.querySelector<HTMLInputElement>('input[data-field="url"]')?.value ??
+      ""
+    ).trim();
+
+    if (!title) {
+      setError("Enter a link title");
+      return;
+    }
+    if (!url) {
+      setError("Enter a URL");
+      return;
+    }
+
     setPending(true);
     setError(null);
     try {
-      await action(formData);
+      const fd = collectFields(root);
+      fd.set("title", title);
+      fd.set("url", url);
+      const created = await addHostLinkAction(fd);
+      onLinkAdded?.(created);
+      setAddFormKey((k) => k + 1);
       onLinksChange?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save link");
@@ -148,108 +208,176 @@ export function ProfileLinksManager({
           {links.map((link) => (
             <li
               key={link.id}
-              className="rounded-md border border-line bg-white p-3 space-y-2"
+              className="space-y-2 rounded-md border border-line bg-white p-3"
             >
-              <form
-                action={(fd) =>
-                  submitAction(async (data) => {
-                    const { updateHostLinkAction } = await import(
-                      "@/lib/host-link-actions"
-                    );
-                    await updateHostLinkAction(data);
-                  }, fd)
-                }
-                className="space-y-2"
-              >
-                <input type="hidden" name="linkId" value={link.id} />
-                <input
-                  name="title"
-                  defaultValue={link.title}
-                  required
-                  maxLength={80}
-                  className="w-full rounded-md border border-line px-3 py-2 text-sm"
-                  placeholder="Link title"
-                />
-                <input
-                  name="url"
-                  type="url"
-                  defaultValue={link.url}
-                  required
-                  className="w-full rounded-md border border-line px-3 py-2 text-sm"
-                  placeholder="https:// or mailto: or tel:"
-                />
-                <HostLinkIconFields
-                  defaultIconKey={link.iconKey}
-                  defaultEmoji={link.emoji}
-                />
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="submit"
-                    disabled={pending}
-                    className="rounded-md border border-line px-3 py-1.5 text-xs font-semibold hover:bg-accent-soft"
-                  >
-                    Save link
-                  </button>
-                </div>
-              </form>
-              <form
-                action={(fd) =>
-                  submitAction(async (data) => {
-                    const { deleteHostLinkAction } = await import(
-                      "@/lib/host-link-actions"
-                    );
-                    await deleteHostLinkAction(data);
-                  }, fd)
-                }
-              >
-                <input type="hidden" name="linkId" value={link.id} />
-                <button
-                  type="submit"
-                  disabled={pending}
-                  className="text-xs font-medium text-muted underline hover:text-foreground"
-                >
-                  Remove
-                </button>
-              </form>
+              <LinkEditRow
+                link={link}
+                pending={pending}
+                onError={setError}
+                onSuccess={(updated) => {
+                  onLinkUpdated?.(updated);
+                  onLinksChange?.();
+                }}
+                onRemoved={() => {
+                  onLinkRemoved?.(link.id);
+                  onLinksChange?.();
+                }}
+                onPending={setPending}
+              />
             </li>
           ))}
         </ul>
       ) : null}
 
-      <form
-        action={(fd) =>
-          submitAction(async (data) => {
-            const { addHostLinkAction } = await import("@/lib/host-link-actions");
-            await addHostLinkAction(data);
-          }, fd)
-        }
+      <div
+        ref={addFormRef}
+        key={addFormKey}
         className="space-y-2 rounded-md border border-dashed border-line bg-panel/50 p-3"
       >
         <p className="text-sm font-medium">Add a link</p>
         <input
-          name="title"
-          required
+          data-field="title"
           maxLength={80}
           className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm"
           placeholder="e.g. My blog"
         />
         <input
-          name="url"
-          required
+          data-field="url"
           className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm"
           placeholder="https:// or mailto: or tel:"
         />
         <HostLinkIconFields />
         <button
-          type="submit"
+          type="button"
           disabled={pending || links.length >= 20}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            void handleAddLink();
+          }}
           className="rounded-md bg-accent px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50"
         >
-          Add link
+          {pending ? "Adding…" : "Add link"}
         </button>
-      </form>
+      </div>
 
       {error ? <p className="text-sm text-red-700">{error}</p> : null}
+    </div>
+  );
+}
+
+function LinkEditRow({
+  link,
+  pending,
+  onError,
+  onSuccess,
+  onRemoved,
+  onPending,
+}: {
+  link: LinkRow;
+  pending: boolean;
+  onError: (msg: string | null) => void;
+  onSuccess?: (link: LinkRow) => void;
+  onRemoved?: () => void;
+  onPending: (v: boolean) => void;
+}) {
+  const rowRef = useRef<HTMLDivElement>(null);
+
+  async function handleSave() {
+    const root = rowRef.current;
+    if (!root) return;
+    onPending(true);
+    onError(null);
+    try {
+      const fd = collectFields(root);
+      fd.set("linkId", link.id);
+      await updateHostLinkAction(fd);
+      const title =
+        root.querySelector<HTMLInputElement>('[data-field="title"]')?.value ??
+        link.title;
+      const url =
+        root.querySelector<HTMLInputElement>('[data-field="url"]')?.value ??
+        link.url;
+      const iconKey =
+        root.querySelector<HTMLInputElement>('input[name="iconKey"]')?.value ??
+        link.iconKey;
+      const emoji =
+        root.querySelector<HTMLInputElement>('input[name="emoji"]')?.value ??
+        link.emoji;
+      onSuccess?.({
+        id: link.id,
+        title,
+        url,
+        iconKey,
+        emoji,
+      });
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "Could not save link");
+    } finally {
+      onPending(false);
+    }
+  }
+
+  async function handleRemove() {
+    onPending(true);
+    onError(null);
+    try {
+      const fd = new FormData();
+      fd.append("linkId", link.id);
+      await deleteHostLinkAction(fd);
+      onRemoved?.();
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "Could not save link");
+    } finally {
+      onPending(false);
+    }
+  }
+
+  return (
+    <div ref={rowRef} className="space-y-2">
+      <input
+        data-field="title"
+        defaultValue={link.title}
+        maxLength={80}
+        className="w-full rounded-md border border-line px-3 py-2 text-sm"
+        placeholder="Link title"
+      />
+      <input
+        data-field="url"
+        defaultValue={link.url}
+        className="w-full rounded-md border border-line px-3 py-2 text-sm"
+        placeholder="https:// or mailto: or tel:"
+      />
+      <HostLinkIconFields
+        defaultIconKey={link.iconKey}
+        defaultEmoji={link.emoji}
+      />
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          disabled={pending}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            void handleSave();
+          }}
+          className="rounded-md border border-line px-3 py-1.5 text-xs font-semibold hover:bg-accent-soft"
+        >
+          Save link
+        </button>
+        <button
+          type="button"
+          disabled={pending}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            void handleRemove();
+          }}
+          className="text-xs font-medium text-muted underline hover:text-foreground"
+        >
+          Remove
+        </button>
+      </div>
     </div>
   );
 }

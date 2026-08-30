@@ -144,6 +144,42 @@ export async function getHostWriteAdapter(
   return createLocalBusyAdapter();
 }
 
+type CalendarConnRow = {
+  provider: string;
+  configJson: string;
+  writeTarget: boolean;
+};
+
+/** True when the host has a fully configured write calendar (not OAuth-pending). */
+export function hostHasConnectedCalendar(
+  connections: CalendarConnRow[],
+): boolean {
+  const writeConn =
+    connections.find((c) => c.writeTarget) ?? connections[0] ?? null;
+  if (!writeConn) return false;
+
+  if (writeConn.provider === "CALDAV") {
+    return Boolean(parseCalDavConfig(writeConn.configJson));
+  }
+  if (writeConn.provider === "OUTLOOK") {
+    return Boolean(parseOutlookConfig(writeConn.configJson)?.calendarId);
+  }
+  if (writeConn.provider === "GOOGLE") {
+    return Boolean(parseGoogleConfig(writeConn.configJson)?.calendarId);
+  }
+  return false;
+}
+
+export async function hostHasConnectedCalendarById(
+  hostId: string,
+): Promise<boolean> {
+  const rows = await prisma.calendarConnection.findMany({
+    where: { hostId },
+    select: { provider: true, configJson: true, writeTarget: true },
+  });
+  return hostHasConnectedCalendar(rows);
+}
+
 /**
  * Busy times for availability: Toucan 121 bookings + external calendar (if any).
  * External errors are logged and treated as no external busy (slots still work).

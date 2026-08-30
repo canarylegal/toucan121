@@ -293,20 +293,34 @@ function backgroundClassFor(preset: BackgroundPreset): string {
 
 function buttonClassFor(preset: ButtonPreset): string {
   const base =
-    "block w-full px-4 py-3.5 text-center text-sm font-semibold transition";
+    "profile-stack-button block w-full px-4 py-3.5 text-center text-sm font-semibold transition";
   const radius =
     preset === "pill" ? "rounded-full" : "rounded-lg";
 
   switch (preset) {
     case "filled":
-      return `${base} ${radius} border border-transparent bg-[var(--profile-accent)] text-[var(--profile-btn-fg)] hover:opacity-90`;
+      return `${base} ${radius} border border-transparent bg-[var(--profile-accent)] hover:opacity-90`;
     case "soft":
-      return `${base} ${radius} border border-transparent bg-[var(--profile-accent-soft)] text-[var(--profile-accent)] hover:opacity-90`;
+      return `${base} ${radius} border border-transparent bg-[var(--profile-accent-soft)] hover:opacity-90`;
     case "pill":
-      return `${base} rounded-full border border-transparent bg-[var(--profile-accent)] text-[var(--profile-btn-fg)] hover:opacity-90`;
+      return `${base} rounded-full border border-transparent bg-[var(--profile-accent)] hover:opacity-90`;
     case "outline":
     default:
-      return `${base} ${radius} border border-[var(--profile-line)] bg-[var(--profile-panel)] text-[var(--profile-fg)] hover:border-[var(--profile-accent)] hover:bg-[var(--profile-accent-soft)]`;
+      return `${base} ${radius} border border-[var(--profile-line)] bg-[var(--profile-panel)] hover:border-[var(--profile-accent)] hover:bg-[var(--profile-accent-soft)]`;
+  }
+}
+
+/** Text colour for tree stack buttons (`<button>` does not inherit themed colour). */
+export function stackButtonTextColor(theme: ProfileTheme): string {
+  switch (theme.buttonPreset) {
+    case "filled":
+    case "pill":
+      return "var(--profile-btn-fg)";
+    case "soft":
+      return "var(--profile-accent)";
+    case "outline":
+    default:
+      return "var(--profile-fg)";
   }
 }
 

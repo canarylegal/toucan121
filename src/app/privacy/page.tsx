@@ -13,7 +13,7 @@ const sections: { title: string; body: string[] }[] = [
     title: "Who we are",
     body: [
       `${APP_NAME} (toucan121.co.uk) is a scheduling service for one-to-one meetings. This policy explains what personal data we process when you use the website, book a meeting, host a profile, or receive related emails.`,
-      "If you have privacy questions, email colin@canarylegalsoftware.co.uk with the subject line “Privacy”.",
+      "If you have privacy questions, email colin@toucan121.co.uk with the subject line “Privacy”.",
     ],
   },
   {
@@ -68,7 +68,7 @@ const sections: { title: string; body: string[] }[] = [
     title: "Your rights",
     body: [
       "Depending on where you live, you may have rights to access, correct, delete, or restrict processing of your personal data, and to object to certain processing.",
-      "To exercise these rights, contact us at colin@canarylegalsoftware.co.uk with the subject “Privacy”.",
+      "To exercise these rights, contact us at colin@toucan121.co.uk with the subject “Privacy”.",
       "You may also complain to your local data protection authority (in the UK, the Information Commissioner’s Office).",
     ],
   },

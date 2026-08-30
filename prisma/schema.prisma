@@ -137,6 +137,10 @@ model Host {
   /// Optional public contact email (may differ from account email)
   publicEmail  String   @default("")
   phone        String   @default("")
+  /// Normalised https://wa.me/… or api.whatsapp.com link
+  whatsappUrl  String   @default("")
+  /// Tree layout: icon row for phone / email / WhatsApp (when 2+ set)
+  contactRowEnabled Boolean @default(true)
   linkedinUrl  String   @default("")
   facebookUrl  String   @default("")
   instagramUrl String   @default("")

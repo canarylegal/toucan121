@@ -13,6 +13,8 @@ import {
 } from "@/lib/host-schedule";
 import { HostScheduleView } from "@/components/host-schedule-view";
 import type { ScheduleViewMode } from "@/lib/schedule-view-actions";
+import { CalendarConnectBanner } from "@/components/calendar-connect-banner";
+import { hostHasConnectedCalendar } from "@/lib/calendar/host-calendar";
 
 export const dynamic = "force-dynamic";
 
@@ -94,6 +96,7 @@ export default async function HostSchedulePage({
     writeConn?.provider === "CALDAV" ||
     writeConn?.provider === "OUTLOOK" ||
     writeConn?.provider === "GOOGLE";
+  const calendarConnected = hostHasConnectedCalendar(host.calendars);
 
   return (
     <main className="mx-auto w-full max-w-6xl px-6 py-12">
@@ -112,9 +115,11 @@ export default async function HostSchedulePage({
           href="/dash/calendar"
           className="text-sm font-medium text-accent underline"
         >
-          {host.calendars.length ? "Calendar connection" : "Connect calendar"}
+          {calendarConnected ? "Calendar connection" : "Connect calendar"}
         </Link>
       </div>
+
+      {!calendarConnected ? <CalendarConnectBanner /> : null}
 
       <div className="mt-8 rounded-lg border border-line bg-panel p-5 sm:p-8">
         <HostScheduleView

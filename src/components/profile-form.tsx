@@ -22,6 +22,7 @@ import {
   stringifyProfileStackOrder,
   type ProfileStackEntry,
 } from "@/lib/profile-stack";
+import { CONTACT_ROW_SOCIAL_KEYS } from "@/lib/profile-contact-row";
 import {
   resolveProfileTheme,
   stringifyProfileTheme,
@@ -80,12 +81,14 @@ function editorLinks(links: ProfileFormValues["links"]) {
 
 export function ProfileForm({ initial, variant = "page", onSaved }: Props) {
   const router = useRouter();
+  const [avatarUploading, setAvatarUploading] = useState(false);
   const [state, action, pending] = useActionState(
     updateProfileAction,
     { values: initial } satisfies ProfileFormState,
   );
   const values = { ...initial, ...(state.values ?? {}) };
-  const links = initial.links ?? [];
+  const [managedLinks, setManagedLinks] = useState(initial.links ?? []);
+  const links = managedLinks;
   const [layoutMode, setLayoutMode] = useState<"BOOK_FIRST" | "LINKS_FIRST">(
     initial.profileLayoutMode ?? "BOOK_FIRST",
   );
@@ -96,6 +99,14 @@ export function ProfileForm({ initial, variant = "page", onSaved }: Props) {
   const [socialOrder, setSocialOrder] = useState<SocialLinkKey[]>(() =>
     parseSocialOrder(JSON.stringify(initial.socialOrder ?? [])),
   );
+  const [contactFields, setContactFields] = useState({
+    phone: initial.phone ?? "",
+    publicEmail: initial.publicEmail ?? "",
+    whatsappUrl: initial.whatsappUrl ?? "",
+  });
+  const [contactRowEnabled, setContactRowEnabled] = useState(
+    initial.contactRowEnabled ?? true,
+  );
   const [profileStackOrder, setProfileStackOrder] = useState<ProfileStackEntry[]>(
     () => {
       const hostFields = stackHostFields(initial);
@@ -105,10 +116,23 @@ export function ProfileForm({ initial, variant = "page", onSaved }: Props) {
         links: stackLinks(links),
         includeBook:
           initial.profileLayoutMode === "LINKS_FIRST" &&
-          (initial.bookingEnabled ?? true),
+          (initial.bookingEnabled ?? true) &&
+          (initial.hasBookableMeetingTypes ?? false),
       });
     },
   );
+
+  const contactFieldCount = [
+    contactFields.phone,
+    contactFields.publicEmail,
+    contactFields.whatsappUrl,
+  ].filter((v) => v.trim()).length;
+  const contactRowWouldShow =
+    linksFirst && contactRowEnabled && contactFieldCount >= 2;
+
+  useEffect(() => {
+    setManagedLinks(initial.links ?? []);
+  }, [initial.links, state.formKey]);
 
   const linkKey = links
     .map(
@@ -143,17 +167,51 @@ export function ProfileForm({ initial, variant = "page", onSaved }: Props) {
   );
 
   useEffect(() => {
-    const hostFields = stackHostFields({ ...initial, socialOrder });
+    const hostFields = stackHostFields({
+      ...initial,
+      socialOrder,
+      phone: contactFields.phone,
+      publicEmail: contactFields.publicEmail,
+      whatsappUrl: contactFields.whatsappUrl,
+      contactRowEnabled,
+    });
     setProfileStackOrder((prev) =>
       mergeProfileStackOrder({
         saved: prev,
         host: hostFields,
         links: stackLinks(links),
         includeBook:
-          layoutMode === "LINKS_FIRST" && (initial.bookingEnabled ?? true),
+          layoutMode === "LINKS_FIRST" &&
+          (initial.bookingEnabled ?? true) &&
+          (initial.hasBookableMeetingTypes ?? false),
+        excludeContactRowSocials: contactRowWouldShow,
       }),
     );
-  }, [linkKey, layoutMode, socialOrder, initial, links]);
+  }, [
+    linkKey,
+    layoutMode,
+    socialOrder,
+    initial,
+    links,
+    contactFields,
+    contactRowWouldShow,
+    contactRowEnabled,
+  ]);
+
+  useEffect(() => {
+    setContactFields({
+      phone: values.phone ?? "",
+      publicEmail: values.publicEmail ?? "",
+      whatsappUrl: values.whatsappUrl ?? "",
+    });
+    setContactRowEnabled(values.contactRowEnabled ?? true);
+  }, [
+    state.formKey,
+    values.phone,
+    values.publicEmail,
+    values.whatsappUrl,
+    values.contactRowEnabled,
+  ]);
 
   useEffect(() => {
     if (state.success) {
@@ -209,6 +267,8 @@ export function ProfileForm({ initial, variant = "page", onSaved }: Props) {
       <AvatarField
         savedPath={values.avatarPath ?? initial.avatarPath}
         displayName={values.name || initial.name}
+        onUploaded={() => router.refresh()}
+        onUploadStateChange={setAvatarUploading}
       />
 
       <Field label="Name" name="name" required defaultValue={values.name} />
@@ -275,20 +335,54 @@ export function ProfileForm({ initial, variant = "page", onSaved }: Props) {
 
       <div className="space-y-3 border-t border-line pt-4">
         <p className="text-sm font-semibold">Contact (optional, public)</p>
-        <Field
-          label="Public email"
-          name="publicEmail"
-          type="email"
-          placeholder="you@example.com"
-          defaultValue={values.publicEmail}
-        />
-        <Field
-          label="Phone"
-          name="phone"
-          type="tel"
-          placeholder="+44 …"
-          defaultValue={values.phone}
-        />
+        <label className="block space-y-1.5">
+          <span className="text-sm font-medium">Public email</span>
+          <input
+            className="w-full rounded-md border border-line bg-white px-3 py-2"
+            name="publicEmail"
+            type="email"
+            placeholder="you@example.com"
+            value={contactFields.publicEmail}
+            onChange={(e) =>
+              setContactFields((prev) => ({
+                ...prev,
+                publicEmail: e.target.value,
+              }))
+            }
+          />
+        </label>
+        <label className="block space-y-1.5">
+          <span className="text-sm font-medium">Phone</span>
+          <input
+            className="w-full rounded-md border border-line bg-white px-3 py-2"
+            name="phone"
+            type="tel"
+            placeholder="+44 …"
+            value={contactFields.phone}
+            onChange={(e) =>
+              setContactFields((prev) => ({ ...prev, phone: e.target.value }))
+            }
+          />
+        </label>
+        <label className="block space-y-1.5">
+          <span className="text-sm font-medium">WhatsApp</span>
+          <input
+            className="w-full rounded-md border border-line bg-white px-3 py-2"
+            name="whatsappUrl"
+            type="text"
+            placeholder="+44 … or https://wa.me/…"
+            value={contactFields.whatsappUrl}
+            onChange={(e) =>
+              setContactFields((prev) => ({
+                ...prev,
+                whatsappUrl: e.target.value,
+              }))
+            }
+          />
+          <span className="text-xs text-muted">
+            Mobile number or WhatsApp link — opens chat in WhatsApp.
+          </span>
+        </label>
         <Field
           label="Website"
           name="websiteUrl"
@@ -296,6 +390,26 @@ export function ProfileForm({ initial, variant = "page", onSaved }: Props) {
           placeholder="https://"
           defaultValue={values.websiteUrl}
         />
+        {linksFirst ? (
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              name="contactRowEnabled"
+              className="mt-0.5"
+              checked={contactRowEnabled}
+              disabled={contactFieldCount < 2}
+              onChange={(e) => setContactRowEnabled(e.target.checked)}
+            />
+            <span>
+              <span className="font-medium">Show contact icons on tree profile</span>
+              <span className="mt-0.5 block text-xs text-muted">
+                {contactFieldCount < 2
+                  ? "Add at least two of phone, email, or WhatsApp to show a contact row above your links."
+                  : "Phone, email, and WhatsApp appear as icons in a row (not in the main button list)."}
+              </span>
+            </span>
+          </label>
+        ) : null}
       </div>
 
       <div className="space-y-3 border-t border-line pt-4">
@@ -414,6 +528,31 @@ export function ProfileForm({ initial, variant = "page", onSaved }: Props) {
         <ProfileLinksManager
           links={editorLinks(links)}
           onLinksChange={() => router.refresh()}
+          onLinkAdded={(link) => {
+            setManagedLinks((prev) => [...prev, link]);
+            setProfileStackOrder((prev) => {
+              const key = `link:${link.id}`;
+              if (
+                prev.some(
+                  (e) => e.type === "link" && e.linkId === link.id,
+                )
+              ) {
+                return prev;
+              }
+              return [...prev, { type: "link", linkId: link.id }];
+            });
+          }}
+          onLinkRemoved={(id) => {
+            setManagedLinks((prev) => prev.filter((l) => l.id !== id));
+            setProfileStackOrder((prev) =>
+              prev.filter((e) => e.type !== "link" || e.linkId !== id),
+            );
+          }}
+          onLinkUpdated={(link) =>
+            setManagedLinks((prev) =>
+              prev.map((l) => (l.id === link.id ? link : l)),
+            )
+          }
         />
       </div>
 
@@ -424,7 +563,9 @@ export function ProfileForm({ initial, variant = "page", onSaved }: Props) {
           </p>
           <p className="mt-1 text-xs text-muted">
             {linksFirst
-              ? "Reorder links, contact details, and the book button on your tree profile."
+              ? contactRowWouldShow
+                ? "Reorder links and the book button. Phone and email are in the contact row above."
+                : "Reorder links, contact details, and the book button on your tree profile."
               : "Reorder custom links shown under your bio."}
           </p>
         </div>
@@ -445,6 +586,9 @@ export function ProfileForm({ initial, variant = "page", onSaved }: Props) {
             const nonLinks = profileStackOrder.filter((e) => e.type !== "link");
             setProfileStackOrder([...next, ...nonLinks]);
           }}
+          hideStackSocialKeys={
+            contactRowWouldShow ? CONTACT_ROW_SOCIAL_KEYS : undefined
+          }
         />
       </div>
 
@@ -455,10 +599,10 @@ export function ProfileForm({ initial, variant = "page", onSaved }: Props) {
 
       <button
         type="submit"
-        disabled={pending}
+        disabled={pending || avatarUploading}
         className="rounded-md bg-accent px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
       >
-        {pending ? "Saving…" : "Save profile"}
+        {pending ? "Saving…" : avatarUploading ? "Uploading photo…" : "Save profile"}
       </button>
     </form>
   );
@@ -469,6 +613,7 @@ function stackHostFields(values: ProfileFormValues) {
     websiteUrl: values.websiteUrl,
     publicEmail: values.publicEmail,
     phone: values.phone,
+    whatsappUrl: values.whatsappUrl ?? "",
     linkedinUrl: values.linkedinUrl,
     facebookUrl: values.facebookUrl,
     instagramUrl: values.instagramUrl,
@@ -482,12 +627,23 @@ function stackHostFields(values: ProfileFormValues) {
 function AvatarField({
   savedPath,
   displayName,
+  onUploaded,
+  onUploadStateChange,
 }: {
   savedPath: string | null;
   displayName: string;
+  onUploaded?: () => void;
+  onUploadStateChange?: (uploading: boolean) => void;
 }) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [removeChecked, setRemoveChecked] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [currentPath, setCurrentPath] = useState(savedPath);
+
+  useEffect(() => {
+    setCurrentPath(savedPath);
+  }, [savedPath]);
 
   useEffect(() => {
     return () => {
@@ -495,7 +651,65 @@ function AvatarField({
     };
   }, [previewUrl]);
 
-  const shownUrl = removeChecked ? null : previewUrl || savedPath;
+  const shownUrl = removeChecked ? null : previewUrl || currentPath;
+
+  async function uploadPhoto(file: File) {
+    const maxBytes = 2 * 1024 * 1024;
+    if (file.size > maxBytes) {
+      setUploadError("Photo must be 2 MB or smaller");
+      return;
+    }
+
+    const allowed = ["image/jpeg", "image/png", "image/webp"];
+    const name = file.name.toLowerCase();
+    const extOk =
+      allowed.includes(file.type) ||
+      name.endsWith(".jpg") ||
+      name.endsWith(".jpeg") ||
+      name.endsWith(".png") ||
+      name.endsWith(".webp");
+    if (!extOk) {
+      setUploadError("Photo must be a JPEG, PNG, or WebP image");
+      return;
+    }
+
+    setUploading(true);
+    setUploadError(null);
+    onUploadStateChange?.(true);
+
+    const formData = new FormData();
+    formData.append("avatar", file);
+
+    try {
+      const res = await fetch("/api/host/avatar", {
+        method: "POST",
+        body: formData,
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        avatarPath?: string;
+      };
+
+      if (!res.ok) {
+        setUploadError(data.error ?? "Could not upload photo");
+        return;
+      }
+
+      if (data.avatarPath) {
+        setCurrentPath(data.avatarPath);
+        setPreviewUrl((prev) => {
+          if (prev) URL.revokeObjectURL(prev);
+          return null;
+        });
+        onUploaded?.();
+      }
+    } catch {
+      setUploadError("Could not upload photo. Check your connection and try again.");
+    } finally {
+      setUploading(false);
+      onUploadStateChange?.(false);
+    }
+  }
 
   return (
     <div className="flex items-center gap-4">
@@ -516,20 +730,31 @@ function AvatarField({
           <span className="font-medium">Profile photo</span>
           <input
             type="file"
-            name="avatar"
             accept="image/jpeg,image/png,image/webp"
-            className="mt-1 block w-full text-sm text-muted file:mr-3 file:rounded-md file:border-0 file:bg-accent file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-white"
+            disabled={uploading}
+            className="mt-1 block w-full text-sm text-muted file:mr-3 file:rounded-md file:border-0 file:bg-accent file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-white disabled:opacity-60"
             onChange={(e) => {
               const file = e.target.files?.[0];
               setRemoveChecked(false);
+              if (!file) return;
+
               setPreviewUrl((prev) => {
                 if (prev) URL.revokeObjectURL(prev);
-                return file ? URL.createObjectURL(file) : null;
+                return URL.createObjectURL(file);
               });
+
+              void uploadPhoto(file);
+              e.target.value = "";
             }}
           />
         </label>
-        {savedPath || previewUrl ? (
+        {uploading ? (
+          <p className="text-xs text-muted">Uploading photo…</p>
+        ) : null}
+        {uploadError ? (
+          <p className="text-xs text-red-700">{uploadError}</p>
+        ) : null}
+        {currentPath || previewUrl ? (
           <label className="flex items-center gap-2 text-muted">
             <input
               type="checkbox"
@@ -548,7 +773,9 @@ function AvatarField({
             Remove current photo
           </label>
         ) : null}
-        <p className="text-xs text-muted">JPEG, PNG, or WebP · max 2 MB</p>
+        <p className="text-xs text-muted">
+          JPEG, PNG, or WebP · max 2 MB · uploads when you choose a file
+        </p>
       </div>
     </div>
   );

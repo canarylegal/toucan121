@@ -34,6 +34,11 @@ a {
   color: inherit;
 }
 
+/* `<button>` does not inherit colour; stack buttons set it explicitly */
+.profile-themed .profile-stack-button {
+  color: var(--profile-fg);
+}
+
 /* Links-first profile themes */
 .profile-themed {
   background-color: var(--profile-bg);

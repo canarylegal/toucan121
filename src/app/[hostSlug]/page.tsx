@@ -18,6 +18,10 @@ import {
   parseProfileTheme,
   resolveProfileTheme,
 } from "@/lib/profile-theme";
+import {
+  resolveContactRowItems,
+  shouldShowContactRow,
+} from "@/lib/profile-contact-row";
 import { HostBrandingHeader } from "@/components/host-branding";
 import { ProfileOwnerControls } from "@/components/profile-owner-controls";
 import { ProfileTreeOwnerExperience } from "@/components/profile-tree-owner-experience";
@@ -88,10 +92,13 @@ export default async function PublicProfilePage({
   const socialOrder = parseSocialOrder(host.socialOrderJson);
   const linksFirst = host.profileLayoutMode === "LINKS_FIRST";
   const bookingEnabled = host.bookingEnabled;
+  const hasBookableMeetingTypes =
+    bookingEnabled && host.meetingTypes.length > 0;
   const hostFields = {
     websiteUrl: host.websiteUrl,
     publicEmail: host.publicEmail,
     phone: host.phone,
+    whatsappUrl: host.whatsappUrl,
     linkedinUrl: host.linkedinUrl,
     facebookUrl: host.facebookUrl,
     instagramUrl: host.instagramUrl,
@@ -100,16 +107,34 @@ export default async function PublicProfilePage({
     youtubeUrl: host.youtubeUrl,
     socialOrderJson: host.socialOrderJson,
   };
+  const contactRowActive =
+    linksFirst &&
+    shouldShowContactRow({
+      phone: host.phone,
+      publicEmail: host.publicEmail,
+      whatsappUrl: host.whatsappUrl,
+      contactRowEnabled: host.contactRowEnabled,
+    });
+  const contactRowItems = contactRowActive
+    ? resolveContactRowItems({
+        phone: host.phone,
+        publicEmail: host.publicEmail,
+        whatsappUrl: host.whatsappUrl,
+        contactRowEnabled: host.contactRowEnabled,
+      })
+    : [];
   const stackEntries = mergeProfileStackOrder({
     saved: parseProfileStackOrder(host.profileStackOrderJson),
     host: hostFields,
     links: host.links,
-    includeBook: linksFirst && bookingEnabled,
+    includeBook: linksFirst && hasBookableMeetingTypes,
+    excludeContactRowSocials: contactRowActive,
   });
   const stackButtons = resolveProfileStackButtons({
     entries: stackEntries,
     host: hostFields,
     links: host.links,
+    excludeContactRowSocials: contactRowActive,
   });
   const customLinkButtons = resolveCustomLinkButtons({
     entries: stackEntries,
@@ -124,6 +149,7 @@ export default async function PublicProfilePage({
     websiteUrl: host.websiteUrl,
     publicEmail: host.publicEmail,
     phone: host.phone,
+    whatsappUrl: host.whatsappUrl,
     linkedinUrl: host.linkedinUrl,
     facebookUrl: host.facebookUrl,
     instagramUrl: host.instagramUrl,
@@ -147,6 +173,7 @@ export default async function PublicProfilePage({
     websiteUrl: host.websiteUrl,
     publicEmail: host.publicEmail,
     phone: host.phone,
+    whatsappUrl: host.whatsappUrl,
     linkedinUrl: host.linkedinUrl,
     facebookUrl: host.facebookUrl,
     instagramUrl: host.instagramUrl,
@@ -155,9 +182,11 @@ export default async function PublicProfilePage({
     youtubeUrl: host.youtubeUrl,
     socialOrder,
     profileLayoutMode: host.profileLayoutMode,
+    contactRowEnabled: host.contactRowEnabled,
     profileStackOrderJson: host.profileStackOrderJson,
     profileThemeJson: host.profileThemeJson,
     bookingEnabled,
+    hasBookableMeetingTypes,
     links: host.links.map((l) => ({
       id: l.id,
       title: l.title,
@@ -170,7 +199,7 @@ export default async function PublicProfilePage({
     avatarPath: host.avatarPath,
   };
 
-  const meetingTypes = bookingEnabled
+  const meetingTypes = hasBookableMeetingTypes
     ? host.meetingTypes.map((mt) => ({
         id: mt.id,
         slug: mt.slug,
@@ -187,7 +216,7 @@ export default async function PublicProfilePage({
     string,
     { value: string; dayKey: string; timeLabel: string; available: boolean }
   >();
-  if (bookingEnabled) {
+  if (hasBookableMeetingTypes) {
     await Promise.all(
       meetingTypes.map(async (mt) => {
         try {
@@ -236,6 +265,7 @@ export default async function PublicProfilePage({
                   overviewCandidates={overviewCandidates}
                   theme={resolvedTheme}
                   bookingEnabled={bookingEnabled}
+                  contactRowItems={contactRowItems}
                 />
               </Suspense>
             ) : (
@@ -274,6 +304,7 @@ export default async function PublicProfilePage({
                   overviewCandidates={overviewCandidates}
                   theme={resolvedTheme}
                   bookingEnabled={bookingEnabled}
+                  contactRowItems={contactRowItems}
                 />
               </>
             )}
@@ -341,7 +372,7 @@ export default async function PublicProfilePage({
       )}
 
       <section className="mt-12">
-        {bookingEnabled ? (
+        {hasBookableMeetingTypes ? (
           <ProfileBookingPanel
             hostSlug={host.slug}
             timezone={host.timezone}

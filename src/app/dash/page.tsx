@@ -18,6 +18,9 @@ import { ProfileLinkActions } from "@/components/profile-link-actions";
 import { VisitorModeBanner } from "@/components/visitor-mode-banner";
 import { ToucanBrand } from "@/components/toucan-brand";
 import { formatSlotLabel } from "@/lib/availability";
+import { dashProfileStatusText } from "@/lib/dash-profile-status";
+import { hostHasConnectedCalendar } from "@/lib/calendar/host-calendar";
+import { CalendarConnectBanner } from "@/components/calendar-connect-banner";
 
 export const dynamic = "force-dynamic";
 
@@ -116,6 +119,9 @@ export default async function DashPage({
         <h1 className="mt-4 font-serif text-4xl tracking-tight">
           Hello, {user.name}
         </h1>
+        <p className="mt-2 max-w-xl text-muted">
+          {dashProfileStatusText(host)}
+        </p>
         {user.emailVerified ? null : <EmailVerifyBanner />}
         <VisitorModeBanner variant={paused ? "paused" : "visitor"} />
         {q.verified === "1" ? (
@@ -252,7 +258,7 @@ export default async function DashPage({
           Hello, {host!.name}
         </h1>
         <p className="mt-2 max-w-xl text-muted">
-          Your links profile is live — booking is off.
+          {dashProfileStatusText(host)}
         </p>
         {user.emailVerified ? null : <EmailVerifyBanner />}
         <VisitorModeBanner variant="links" />
@@ -345,6 +351,13 @@ export default async function DashPage({
             where: { deletedAt: null },
             orderBy: { title: "asc" },
           },
+          calendars: {
+            select: {
+              provider: true,
+              configJson: true,
+              writeTarget: true,
+            },
+          },
         },
       }),
       prisma.booking.findMany({
@@ -412,6 +425,10 @@ export default async function DashPage({
   const meetingTypeCreated = q.meetingTypeCreated === "1";
   const hostingEnabled = q.hostingEnabled === "1";
   const bookingUrl = `${appUrl}/${hostFull.slug}`;
+  const needsCalendar =
+    hostFull.bookingEnabled &&
+    hostFull.hostingActive &&
+    !hostHasConnectedCalendar(hostFull.calendars);
 
   return (
     <main className="mx-auto w-full max-w-7xl px-6 py-12">
@@ -431,7 +448,7 @@ export default async function DashPage({
         Hello, {hostFull.name}
       </h1>
       <p className="mt-2 max-w-xl text-muted">
-        Your public profile page is live.
+        {dashProfileStatusText(hostFull)}
       </p>
       {user.emailVerified ? null : <EmailVerifyBanner />}
       {q.verified === "1" ? (
@@ -445,6 +462,7 @@ export default async function DashPage({
           Hosting enabled — connect a calendar and share your profile link.
         </p>
       ) : null}
+      {needsCalendar ? <CalendarConnectBanner /> : null}
       {bookedPending ? (
         <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
           Invitation sent — pending until the invitee accepts.

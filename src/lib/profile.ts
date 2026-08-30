@@ -1,8 +1,10 @@
-import { mkdir, unlink, writeFile } from "fs/promises";
-import path from "path";
-import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { isValidTimezone } from "@/lib/timezones";
+import { z } from "zod";
+import {
+  deleteAvatarFile,
+  saveAvatarFile,
+} from "@/lib/profile-avatar";
 import {
   parseSocialOrder,
   stringifySocialOrder,
@@ -12,14 +14,10 @@ import {
   parseProfileTheme,
   stringifyProfileTheme,
 } from "@/lib/profile-theme";
-
-const ALLOWED_TYPES: Record<string, string> = {
-  "image/jpeg": ".jpg",
-  "image/png": ".png",
-  "image/webp": ".webp",
-};
-
-const MAX_BYTES = 2 * 1024 * 1024;
+import {
+  isValidWhatsAppInput,
+  normalizeWhatsAppUrl,
+} from "@/lib/whatsapp";
 
 const optionalUrl = z
   .string()
@@ -35,6 +33,20 @@ const optionalEmail = z
   .trim()
   .max(160)
   .refine((v) => !v || z.string().email().safeParse(v).success, "Invalid email");
+
+const optionalWhatsApp = z
+  .string()
+  .trim()
+  .max(200)
+  .superRefine((v, ctx) => {
+    if (v && !isValidWhatsAppInput(v)) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Enter a phone number or WhatsApp link",
+      });
+    }
+  })
+  .transform((v) => normalizeWhatsAppUrl(v));
 
 export const profileSchema = z.object({
   name: z.string().trim().min(1).max(80),
@@ -55,6 +67,7 @@ export const profileSchema = z.object({
   websiteUrl: optionalUrl,
   publicEmail: optionalEmail,
   phone: z.string().trim().max(40),
+  whatsappUrl: optionalWhatsApp,
   linkedinUrl: optionalUrl,
   facebookUrl: optionalUrl,
   instagramUrl: optionalUrl,
@@ -63,6 +76,7 @@ export const profileSchema = z.object({
   youtubeUrl: optionalUrl,
   socialOrderJson: z.string().trim().max(500).default("[]"),
   profileLayoutMode: z.enum(["BOOK_FIRST", "LINKS_FIRST"]).default("BOOK_FIRST"),
+  contactRowEnabled: z.boolean().default(true),
   profileStackOrderJson: z.string().trim().max(4000).default("[]"),
   profileThemeJson: z
     .string()
@@ -90,6 +104,7 @@ export type ProfileFormValues = {
   websiteUrl: string;
   publicEmail: string;
   phone: string;
+  whatsappUrl: string;
   linkedinUrl: string;
   facebookUrl: string;
   instagramUrl: string;
@@ -98,6 +113,7 @@ export type ProfileFormValues = {
   youtubeUrl: string;
   socialOrder: SocialLinkKey[];
   profileLayoutMode: "BOOK_FIRST" | "LINKS_FIRST";
+  contactRowEnabled: boolean;
   profileStackOrderJson: string;
   profileThemeJson: string;
   links?: {
@@ -111,53 +127,9 @@ export type ProfileFormValues = {
   bookingHorizonDays: number;
   avatarPath: string | null;
   bookingEnabled?: boolean;
+  /** Active meeting types exist — tree “Book a meeting” only when true with bookingEnabled. */
+  hasBookableMeetingTypes?: boolean;
 };
-
-function avatarsDir() {
-  return path.join(process.cwd(), "public", "uploads", "avatars");
-}
-
-function avatarExtension(file: File): string | null {
-  const fromType = ALLOWED_TYPES[file.type];
-  if (fromType) return fromType;
-  const name = file.name.trim().toLowerCase();
-  if (name.endsWith(".jpg") || name.endsWith(".jpeg")) return ".jpg";
-  if (name.endsWith(".png")) return ".png";
-  if (name.endsWith(".webp")) return ".webp";
-  return null;
-}
-
-async function saveAvatar(hostId: string, file: File): Promise<string> {
-  const ext = avatarExtension(file);
-  if (!ext) {
-    throw new Error("Photo must be a JPEG, PNG, or WebP image");
-  }
-  if (file.size > MAX_BYTES) {
-    throw new Error("Photo must be 2 MB or smaller");
-  }
-
-  const dir = avatarsDir();
-  await mkdir(dir, { recursive: true });
-
-  const filename = `${hostId}${ext}`;
-  const diskPath = path.join(dir, filename);
-  const buffer = Buffer.from(await file.arrayBuffer());
-  await writeFile(diskPath, buffer);
-
-  return `/uploads/avatars/${filename}?v=${Date.now()}`;
-}
-
-async function deleteAvatarFile(avatarPath: string | null | undefined) {
-  if (!avatarPath) return;
-  const clean = avatarPath.split("?")[0] ?? "";
-  const base = path.basename(clean);
-  if (!base || base.includes("..")) return;
-  try {
-    await unlink(path.join(avatarsDir(), base));
-  } catch {
-    // ignore missing files
-  }
-}
 
 export async function updateHostProfile(opts: {
   hostId: string;
@@ -178,7 +150,7 @@ export async function updateHostProfile(opts: {
     avatarPath = null;
   } else if (opts.avatarFile && opts.avatarFile.size > 0) {
     await deleteAvatarFile(host.avatarPath);
-    avatarPath = await saveAvatar(host.id, opts.avatarFile);
+    avatarPath = await saveAvatarFile(host.id, opts.avatarFile);
   }
 
   const [updated] = await prisma.$transaction([
@@ -192,6 +164,7 @@ export async function updateHostProfile(opts: {
         websiteUrl: data.websiteUrl,
         publicEmail: data.publicEmail,
         phone: data.phone,
+        whatsappUrl: data.whatsappUrl,
         linkedinUrl: data.linkedinUrl,
         facebookUrl: data.facebookUrl,
         instagramUrl: data.instagramUrl,
@@ -202,6 +175,7 @@ export async function updateHostProfile(opts: {
           parseSocialOrder(data.socialOrderJson),
         ),
         profileLayoutMode: data.profileLayoutMode,
+        contactRowEnabled: data.contactRowEnabled,
         profileStackOrderJson: data.profileStackOrderJson,
         profileThemeJson: data.profileThemeJson,
         timezone: data.timezone,

@@ -1,11 +1,14 @@
 import type { ResolvedStackButton } from "@/lib/profile-stack";
-import type { ResolvedProfileTheme } from "@/lib/profile-theme";
+import {
+  stackButtonTextColor,
+  type ResolvedProfileTheme,
+} from "@/lib/profile-theme";
 import { CalendarIcon, SOCIAL_LINK_META } from "@/components/social-icons";
 import { HostLinkIcon } from "@/components/link-icons";
 import { parseHostLinkIconKey } from "@/lib/link-icons";
 
 const defaultButtonClass =
-  "block w-full rounded-lg border border-line bg-panel px-4 py-3.5 text-center text-sm font-semibold text-foreground transition hover:border-accent/60 hover:bg-accent-soft";
+  "profile-stack-button block w-full rounded-lg border border-line bg-panel px-4 py-3.5 text-center text-sm font-semibold text-foreground transition hover:border-accent/60 hover:bg-accent-soft";
 
 function ButtonLabel({
   item,
@@ -71,10 +74,18 @@ export function ProfileLinkButton({
   theme?: ResolvedProfileTheme;
 }) {
   const buttonClass = theme?.buttonClass ?? defaultButtonClass;
+  const buttonStyle = theme
+    ? { color: stackButtonTextColor(theme) }
+    : undefined;
 
   if (item.kind === "book") {
     return (
-      <button type="button" onClick={onBook} className={buttonClass}>
+      <button
+        type="button"
+        onClick={onBook}
+        className={buttonClass}
+        style={buttonStyle}
+      >
         <ButtonLabel item={item} theme={theme} />
       </button>
     );
@@ -88,6 +99,7 @@ export function ProfileLinkButton({
       target={item.external ? "_blank" : undefined}
       rel={item.external ? "noreferrer" : undefined}
       className={buttonClass}
+      style={buttonStyle}
     >
       <ButtonLabel item={item} theme={theme} />
     </a>

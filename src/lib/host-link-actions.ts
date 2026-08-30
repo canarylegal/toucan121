@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { ZodError } from "zod";
 import { requireHost } from "@/lib/current-user";
 import { prisma } from "@/lib/db";
 import {
@@ -30,12 +31,20 @@ function revalidateHost(slug: string | undefined) {
 
 export async function addHostLinkAction(formData: FormData) {
   const host = await requireHost();
-  const parsed = hostLinkInputSchema.parse({
-    title: String(formData.get("title") ?? ""),
-    url: String(formData.get("url") ?? ""),
-    iconKey: String(formData.get("iconKey") ?? ""),
-    emoji: String(formData.get("emoji") ?? ""),
-  });
+  let parsed;
+  try {
+    parsed = hostLinkInputSchema.parse({
+      title: String(formData.get("title") ?? ""),
+      url: String(formData.get("url") ?? ""),
+      iconKey: String(formData.get("iconKey") ?? ""),
+      emoji: String(formData.get("emoji") ?? ""),
+    });
+  } catch (err) {
+    if (err instanceof ZodError) {
+      throw new Error(err.issues[0]?.message ?? "Invalid link");
+    }
+    throw err;
+  }
 
   const count = await prisma.hostLink.count({
     where: { hostId: host.id, active: true },
@@ -62,17 +71,33 @@ export async function addHostLinkAction(formData: FormData) {
   });
 
   revalidateHost(host.slug);
+
+  return {
+    id: link.id,
+    title: link.title,
+    url: link.url,
+    iconKey: link.iconKey,
+    emoji: link.emoji,
+  };
 }
 
 export async function updateHostLinkAction(formData: FormData) {
   const host = await requireHost();
   const linkId = String(formData.get("linkId") ?? "");
-  const parsed = hostLinkInputSchema.parse({
-    title: String(formData.get("title") ?? ""),
-    url: String(formData.get("url") ?? ""),
-    iconKey: String(formData.get("iconKey") ?? ""),
-    emoji: String(formData.get("emoji") ?? ""),
-  });
+  let parsed;
+  try {
+    parsed = hostLinkInputSchema.parse({
+      title: String(formData.get("title") ?? ""),
+      url: String(formData.get("url") ?? ""),
+      iconKey: String(formData.get("iconKey") ?? ""),
+      emoji: String(formData.get("emoji") ?? ""),
+    });
+  } catch (err) {
+    if (err instanceof ZodError) {
+      throw new Error(err.issues[0]?.message ?? "Invalid link");
+    }
+    throw err;
+  }
 
   const existing = await prisma.hostLink.findFirst({
     where: { id: linkId, hostId: host.id },

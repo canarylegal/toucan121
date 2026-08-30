@@ -1,5 +1,6 @@
 import type { SocialLinkKey } from "@/components/social-icons";
 import { SOCIAL_LINK_META } from "@/components/social-icons";
+import { CONTACT_ROW_SOCIAL_KEYS } from "@/lib/profile-contact-row";
 import { parseSocialOrder } from "@/lib/social-order";
 
 export type ProfileStackEntry =
@@ -31,6 +32,7 @@ type HostFields = {
   websiteUrl: string;
   publicEmail: string;
   phone: string;
+  whatsappUrl: string;
   linkedinUrl: string;
   facebookUrl: string;
   instagramUrl: string;
@@ -44,6 +46,16 @@ const metaByKey = new Map(SOCIAL_LINK_META.map((m) => [m.key, m]));
 
 function linkValue(host: HostFields, key: SocialLinkKey): string {
   return (host[key] ?? "").trim();
+}
+
+function withoutContactRowSocials(
+  keys: Set<SocialLinkKey>,
+  excludeContactRowSocials?: boolean,
+): Set<SocialLinkKey> {
+  if (!excludeContactRowSocials) return keys;
+  const next = new Set(keys);
+  for (const key of CONTACT_ROW_SOCIAL_KEYS) next.delete(key);
+  return next;
 }
 
 export function parseProfileStackOrder(
@@ -109,14 +121,18 @@ export function mergeProfileStackOrder(opts: {
   host: HostFields;
   links: HostLinkRow[];
   includeBook?: boolean;
+  excludeContactRowSocials?: boolean;
 }): ProfileStackEntry[] {
   const activeLinkIds = new Set(
     opts.links.filter((l) => l.active).map((l) => l.id),
   );
-  const socialWithValue = new Set(
-    parseSocialOrder(opts.host.socialOrderJson).filter((k) =>
-      linkValue(opts.host, k),
+  const socialWithValue = withoutContactRowSocials(
+    new Set(
+      parseSocialOrder(opts.host.socialOrderJson).filter((k) =>
+        linkValue(opts.host, k),
+      ),
     ),
+    opts.excludeContactRowSocials,
   );
 
   const merged: ProfileStackEntry[] = [];
@@ -169,9 +185,13 @@ export function resolveProfileStackButtons(opts: {
   entries: ProfileStackEntry[];
   host: HostFields;
   links: HostLinkRow[];
+  excludeContactRowSocials?: boolean;
 }): ResolvedStackButton[] {
   const linkById = new Map(opts.links.map((l) => [l.id, l]));
   const buttons: ResolvedStackButton[] = [];
+  const skipSocial = opts.excludeContactRowSocials
+    ? new Set(CONTACT_ROW_SOCIAL_KEYS)
+    : null;
 
   for (const entry of opts.entries) {
     if (entry.type === "book") {
@@ -183,6 +203,7 @@ export function resolveProfileStackButtons(opts: {
       continue;
     }
     if (entry.type === "social") {
+      if (skipSocial?.has(entry.key)) continue;
       const meta = metaByKey.get(entry.key);
       const value = linkValue(opts.host, entry.key);
       if (!meta || !value) continue;
@@ -228,6 +249,7 @@ export function resolveCustomLinkButtons(opts: {
       websiteUrl: "",
       publicEmail: "",
       phone: "",
+      whatsappUrl: "",
       linkedinUrl: "",
       facebookUrl: "",
       instagramUrl: "",
