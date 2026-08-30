@@ -20,3 +20,7 @@ Open [http://localhost:3000](http://localhost:3000).
 ## Stack
 
 Next.js, Prisma, Postgres. Optional Outlook and Google host calendars; Google host connect is off until Google Cloud verification.
+
+## Licence
+
+Toucan 121 is open source under the [MIT License](./LICENSE).
