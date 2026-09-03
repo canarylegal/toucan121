@@ -134,8 +134,8 @@ export async function sendEmail(message: OutboundEmail): Promise<void> {
       response: info.response,
     });
   } catch (err) {
-    console.error("[toucan:email] SMTP send failed; falling back to console", err);
-    logFallback(message, from);
+    console.error("[toucan:email] SMTP send failed", err);
+    throw err instanceof Error ? err : new Error("SMTP send failed");
   }
 }
 

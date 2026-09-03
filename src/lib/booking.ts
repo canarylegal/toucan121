@@ -14,6 +14,7 @@ import {
 } from "@/lib/calendar/host-calendar";
 import { buildCalendarCancel, buildCalendarInvite } from "@/lib/ics";
 import { sendEmail } from "@/lib/email";
+import { hostNotifyEmail } from "@/lib/host-notify-email";
 import {
   formatEmailWhen,
   renderBookingEmail,
@@ -349,6 +350,7 @@ async function sendConfirmedEmails(opts: {
   toGuest: boolean;
 }) {
   const { host, meetingType, booking, location, toGuest } = opts;
+  const hostInbox = await hostNotifyEmail(host);
   const ics = buildCalendarInvite({
     uid: booking.id,
     title: `${meetingType.title} with ${host.name}`,
@@ -363,14 +365,14 @@ async function sendConfirmedEmails(opts: {
     startsAt: booking.startsAt,
     endsAt: booking.endsAt,
     organizerName: host.name,
-    organizerEmail: host.email,
+    organizerEmail: hostInbox,
     guestName: booking.guestName,
     guestEmail: booking.guestEmail,
     url: booking.jitsiUrl ?? undefined,
   });
 
   const selfBook =
-    booking.guestEmail.trim().toLowerCase() === host.email.trim().toLowerCase();
+    booking.guestEmail.trim().toLowerCase() === hostInbox.trim().toLowerCase();
   // When CalDAV/Outlook already has the event, an emailed .ics with a different
   // history of UIDs (or a second METHOD:REQUEST) often lands as a duplicate —
   // especially when the host books themselves.
@@ -424,7 +426,7 @@ async function sendConfirmedEmails(opts: {
     hasCalendarInvite: attachHostIcs,
   });
   await sendEmail({
-    to: host.email,
+    to: hostInbox,
     replyTo: booking.guestEmail,
     subject: hostMail.subject,
     text: hostMail.text,
@@ -602,6 +604,7 @@ export async function declineOrCancelBooking(opts: {
   });
 
   const location = locationFor(updated);
+  const hostInbox = await hostNotifyEmail(updated.host);
 
   const cancelIcs =
     wasConfirmed
@@ -613,7 +616,7 @@ export async function declineOrCancelBooking(opts: {
           startsAt: updated.startsAt,
           endsAt: updated.endsAt,
           organizerName: updated.host.name,
-          organizerEmail: updated.host.email,
+          organizerEmail: hostInbox,
           guestName: updated.guestName,
           guestEmail: updated.guestEmail,
           url: updated.jitsiUrl ?? undefined,
@@ -635,7 +638,7 @@ export async function declineOrCancelBooking(opts: {
       hasCalendarInvite: Boolean(cancelIcs),
     });
     await sendEmail({
-      to: updated.host.email,
+      to: hostInbox,
       replyTo: updated.guestEmail,
       subject: toHost.subject,
       text: toHost.text,
@@ -679,7 +682,7 @@ export async function declineOrCancelBooking(opts: {
       location,
     });
     await sendEmail({
-      to: updated.host.email,
+      to: hostInbox,
       replyTo: updated.guestEmail,
       subject: toHost.subject,
       text: toHost.text,
@@ -721,7 +724,7 @@ export async function declineOrCancelBooking(opts: {
       hasCalendarInvite: Boolean(cancelIcs),
     });
     await sendEmail({
-      to: updated.host.email,
+      to: hostInbox,
       replyTo: updated.guestEmail,
       subject: toHost.subject,
       text: toHost.text,
@@ -854,6 +857,8 @@ export async function rescheduleBooking(opts: {
     });
   }
 
+  const hostInbox = await hostNotifyEmail(updated.host);
+
   const ics =
     updated.status === "CONFIRMED"
       ? buildCalendarInvite({
@@ -864,7 +869,7 @@ export async function rescheduleBooking(opts: {
           startsAt: updated.startsAt,
           endsAt: updated.endsAt,
           organizerName: updated.host.name,
-          organizerEmail: updated.host.email,
+          organizerEmail: hostInbox,
           guestName: updated.guestName,
           guestEmail: updated.guestEmail,
           url: updated.jitsiUrl ?? undefined,
@@ -873,7 +878,7 @@ export async function rescheduleBooking(opts: {
 
   const selfBook =
     updated.guestEmail.trim().toLowerCase() ===
-    updated.host.email.trim().toLowerCase();
+    hostInbox.trim().toLowerCase();
   const externalCalendar = await hostHasExternalWriteCalendar(updated.hostId);
   const attachGuestIcs = Boolean(ics) && !selfBook;
   const attachHostIcs = Boolean(ics) && !externalCalendar;
@@ -940,7 +945,7 @@ export async function rescheduleBooking(opts: {
     hasCalendarInvite: attachHostIcs && Boolean(ics),
   });
   await sendEmail({
-    to: updated.host.email,
+    to: hostInbox,
     replyTo: updated.guestEmail,
     subject: hostMail.subject,
     text: hostMail.text,
@@ -1081,6 +1086,7 @@ export async function createBooking(opts: {
 
   const inviteUrl = `${appUrl()}/invite/${booking.manageToken}`;
   const hostDashboard = `${appUrl()}/dash`;
+  const hostInbox = await hostNotifyEmail(host);
 
   if (decision.status === "CONFIRMED") {
     const shouldEmailGuest =
@@ -1140,7 +1146,7 @@ export async function createBooking(opts: {
       notes: parsed.notes,
     });
     await sendEmail({
-      to: host.email,
+      to: hostInbox,
       replyTo: parsed.guestEmail,
       subject: hostMail.subject,
       text: hostMail.text,
@@ -1163,7 +1169,7 @@ export async function createBooking(opts: {
       primaryCta: { label: "Review in dashboard", url: hostDashboard },
     });
     await sendEmail({
-      to: host.email,
+      to: hostInbox,
       replyTo: parsed.guestEmail,
       subject: hostMail.subject,
       text: hostMail.text,

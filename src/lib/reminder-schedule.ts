@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { sendEmail } from "@/lib/email";
+import { hostNotifyEmail } from "@/lib/host-notify-email";
 import { renderBookingEmail } from "@/lib/email-templates";
 import { APP_NAME } from "@/lib/brand";
 import {
@@ -40,8 +41,9 @@ export async function rebuildRemindersForBooking(opts: {
 
   const hostPrefs = parseReminderPrefs(booking.hostReminderJson);
   const guestPrefs = parseReminderPrefs(booking.guestReminderJson);
+  const hostInbox = await hostNotifyEmail(booking.host);
   const [hostSuppressed, guestSuppressed] = await Promise.all([
-    isReminderSuppressed(booking.host.email, "HOST"),
+    isReminderSuppressed(hostInbox, "HOST"),
     isReminderSuppressed(booking.guestEmail, "GUEST"),
   ]);
   const planned = planReminders({
@@ -107,8 +109,9 @@ export async function processDueReminders(opts?: { limit?: number }) {
       continue;
     }
 
+    const hostInbox = await hostNotifyEmail(booking.host);
     const email =
-      row.recipient === "GUEST" ? booking.guestEmail : booking.host.email;
+      row.recipient === "GUEST" ? booking.guestEmail : hostInbox;
     if (await isReminderSuppressed(email, row.recipient)) {
       await prisma.bookingReminder.update({
         where: { id: row.id },
@@ -188,7 +191,7 @@ export async function processDueReminders(opts?: { limit?: number }) {
           unsubscribe,
         });
         await sendEmail({
-          to: booking.host.email,
+          to: hostInbox,
           replyTo: booking.guestEmail,
           subject: mail.subject,
           text: mail.text,

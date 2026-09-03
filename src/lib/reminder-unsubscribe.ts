@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "crypto";
 import { prisma } from "@/lib/db";
+import { hostNotifyEmail } from "@/lib/host-notify-email";
 import { appBaseUrl } from "@/lib/email-tokens";
 import {
   DISABLED_REMINDER_PREFS,
@@ -186,9 +187,10 @@ export async function emailForReminderRecipient(
     where: { id: bookingId },
     select: {
       guestEmail: true,
-      host: { select: { email: true } },
+      host: { select: { id: true, email: true, userId: true } },
     },
   });
   if (!booking) return null;
-  return recipient === "GUEST" ? booking.guestEmail : booking.host.email;
+  if (recipient === "GUEST") return booking.guestEmail;
+  return hostNotifyEmail(booking.host);
 }
